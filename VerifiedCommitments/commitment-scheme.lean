@@ -30,7 +30,8 @@ def perfect_binding (scheme : CommitmentScheme M C O K) : Prop :=
 -- Security depends on generating the parameters correctly, but at this level probably alright to have the group and generator fixed
 -- h should be inside the game, because its unique to a specific run
 def comp_binding_game (scheme : CommitmentScheme M C O K)
-  (A : K → PMF (C × M × M × O × O)) [DecidableEq M] : PMF $ ZMod 2 :=
+  (A : K → PMF (C × M × M × O × O)) : PMF $ ZMod 2 :=
+  open scoped Classical in
   do
     let h ← scheme.setup
     let (c, m, m', o, o') ← A h
