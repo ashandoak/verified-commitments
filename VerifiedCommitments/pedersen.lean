@@ -116,11 +116,11 @@ lemma binding_as_hard_dlog
     simpa [h_ord] using (pow_eq_pow_iff_modEq.mp h_pow)
 
   have h_zmod : (m + x * o : ZMod q) = (m' + x * o' : ZMod q) := by
-    -- rw [ZMod.eq_iff_val_modEq]
-    -- -- What is the alternative to the deprecated lemma?
-    -- convert h_congr_nat using 1 -- what is convert actually doing here?
-    -- · rw [@ZMod.val_add]
-    sorry
+    have eq_cast : ((m.val + x.val * o.val : ℕ) : ZMod q) =
+                  ((m'.val + x.val * o'.val : ℕ) : ZMod q) :=
+      (ZMod.eq_iff_modEq_nat _).mpr h_congr_nat
+    simp at eq_cast
+    exact eq_cast
 
   have h_lin : x * (o' - o) = m - m' := by grind
 
