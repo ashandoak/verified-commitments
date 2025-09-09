@@ -31,19 +31,19 @@ namespace Pedersen
     do
       let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
       have h_nonempty : nonzero_elements.Nonempty := by
-          have one_ne_zero : (1 : ZMod q) ≠ 0 := by
-            intro h
-            have : q ∣ 1 := by
-              simp only [Nat.dvd_one]
-              exact ZMod.one_eq_zero_iff.mp h
-            have q_eq_one : q = 1 := Nat.dvd_one.1 this
-            exact (Nat.Prime.ne_one hq_prime q_eq_one)
-          have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
-            apply Finset.mem_erase.mpr
-            constructor
-            · exact one_ne_zero
-            · simp
-          exact ⟨1, mem1⟩
+        have one_ne_zero : (1 : ZMod q) ≠ 0 := by
+          intro h
+          have : q ∣ 1 := by
+            simp only [Nat.dvd_one]
+            exact ZMod.one_eq_zero_iff.mp h
+          have q_eq_one : q = 1 := Nat.dvd_one.1 this
+          exact (Nat.Prime.ne_one hq_prime q_eq_one)
+        have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
+          apply Finset.mem_erase.mpr
+          constructor
+          · exact one_ne_zero
+          · simp
+        exact ⟨1, mem1⟩
       let a ← PMF.uniformOfFinset nonzero_elements h_nonempty
       return g^a.val,
     commit := fun h m =>  --commit h m g,
@@ -74,7 +74,19 @@ noncomputable def DLog_game
   do
     let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
     have h_nonempty : nonzero_elements.Nonempty := by
-      sorry
+      have one_ne_zero : (1 : ZMod q) ≠ 0 := by
+        intro h
+        have : q ∣ 1 := by
+          simp only [Nat.dvd_one]
+          exact ZMod.one_eq_zero_iff.mp h
+        have q_eq_one : q = 1 := Nat.dvd_one.1 this
+        exact (Nat.Prime.ne_one hq_prime q_eq_one)
+      have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
+        apply Finset.mem_erase.mpr
+        constructor
+        · exact one_ne_zero
+        · simp
+      exact ⟨1, mem1⟩
     let x ← PMF.uniformOfFinset nonzero_elements h_nonempty
     let h := g^x.val
     let x' ← A' h
