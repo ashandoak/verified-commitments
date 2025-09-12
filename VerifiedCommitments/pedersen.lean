@@ -15,7 +15,7 @@ import VerifiedCommitments.dlog
 namespace Pedersen
 
   noncomputable def scheme
-    (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
+    (G : Type)  [Group G]  [DecidableEq G] (g : G)
       (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) :
       CommitmentScheme (ZMod q) G (ZMod q) G := {
     setup := --setup q hq g,
@@ -45,7 +45,7 @@ namespace Pedersen
   }
 
   noncomputable def adversary
-    (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G]
+    (G : Type)
       (q : ℕ) [NeZero q]
       (A : G → PMF (G × ZMod q × ZMod q × ZMod q × ZMod q))
       (h : G) : PMF (ZMod q) :=
@@ -59,7 +59,7 @@ namespace Pedersen
 end Pedersen
 
 noncomputable def DLog_game
-  (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
+  (G : Type)  [Group G] [DecidableEq G] (g : G)
     (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q)
     (A' : G → PMF (ZMod q)) : PMF (ZMod 2) :=
   do
@@ -85,8 +85,8 @@ noncomputable def DLog_game
 
 
 lemma binding_as_hard_dlog
-  (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] (hq_prime : Nat.Prime q) (ε : ENNReal)
+  (G : Type) [Fintype G] [Group G] [DecidableEq G] (g : G)
+    (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) (ε : ENNReal)
     (G_card_q : Fintype.card G = q)
     (hg_gen : orderOf g = Fintype.card G)
     (A : G → PMF (G × ZMod q × ZMod q × ZMod q × ZMod q)) :
@@ -172,12 +172,12 @@ lemma binding_as_hard_dlog
 
 
 theorem Pedersen.computational_binding :
-  ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] (hq_prime : Nat.Prime q) (ε : ENNReal)
+  ∀ (G : Type) [Fintype G] [Group G] [DecidableEq G] (g : G)
+    (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) (ε : ENNReal)
     (G_card_q : Fintype.card G = q)
     (hg_gen : orderOf g = Fintype.card G),
     (∀ (A : G → PMF (ZMod q)), DLog_game G g q hq_prime A 1 ≤ ε) →
     (∀ (A : G → PMF (G × ZMod q × ZMod q × ZMod q × ZMod q)),
     comp_binding_game (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
-  intro G _ _ _ _ g q _ _ hq_prime ε G_card_q hg_gen hdlog A
+  intro G _ _ _ g q _ hq_prime ε G_card_q hg_gen hdlog A
   exact le_trans (binding_as_hard_dlog G g q hq_prime ε G_card_q hg_gen A) (hdlog (Pedersen.adversary G q A))
