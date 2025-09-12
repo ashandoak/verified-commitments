@@ -7,19 +7,10 @@ import VerifiedCommitments.«commitment-scheme»
 import VerifiedCommitments.dlog
 
 
--- Helper lemma
-lemma ZMod.eq_iff_val_modEq (n : ℕ) [NeZero n] (a b : ZMod n) : a = b ↔ a.val ≡ b.val [MOD n] := by
-  constructor
-  · intro h
-    rw [h]
-  · intro h_congr
-    -- Convert to integer cast equality
-    have h1 : (a.val : ZMod n) = a := ZMod.natCast_zmod_val a
-    have h2 : (b.val : ZMod n) = b := ZMod.natCast_zmod_val b
-    rw [← h1, ← h2]
-    rw [ZMod.eq_iff_modEq_nat]
-    exact h_congr
 
+-- Start section to hold variables
+-- g and q and typeclasses
+-- For Mathlib:
 
 namespace Pedersen
 
@@ -190,15 +181,3 @@ theorem Pedersen.computational_binding :
     comp_binding_game (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
   intro G _ _ _ _ g q _ _ hq_prime ε G_card_q hg_gen hdlog A
   exact le_trans (binding_as_hard_dlog G g q hq_prime ε G_card_q hg_gen A) (hdlog (Pedersen.adversary G q A))
-
-
--- Incomplete
-theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-  (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q),
-  perfect_hiding (Pedersen.scheme G g q hq_prime) := by
-  intro G _ _ _ _ g q _ hq_prime
-  unfold _root_.perfect_hiding
-  intros m m' c
-  unfold do_commit
-  unfold Pedersen.scheme
-  congr!
