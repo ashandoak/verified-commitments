@@ -12,12 +12,24 @@ import VerifiedCommitments.dlog
 -- g and q and typeclasses
 -- For Mathlib:
 
+section public_parameters
+
+-- I'm not sure this is actually better - Probably if I'm going to simulate the public parameter in
+-- this way I'm going to want to go with a minimal set of typeclasses, then provide instances as
+-- necessary in later proofs
+
+-- But I really don't get how variables are passed around in defs and theorems. It make sense when
+-- I read or hear the explination, but it never seems to quite align with the behaviour I see in
+-- the editor.
+variable (G' : Type) [Group G'] [DecidableEq G'] (g' : G')
+
+
 namespace Pedersen
 
   noncomputable def scheme
-    (G : Type)  [Group G]  [DecidableEq G] (g : G)
+    --(G : Type)  [Group G]  [DecidableEq G] (g : G)
       (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) :
-      CommitmentScheme (ZMod q) G (ZMod q) G := {
+      CommitmentScheme (ZMod q) G' (ZMod q) G' := {
     setup := --setup q hq g,
     do
       let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
@@ -36,12 +48,12 @@ namespace Pedersen
           · simp
         exact ⟨1, mem1⟩
       let a ← PMF.uniformOfFinset nonzero_elements h_nonempty
-      return g^a.val,
+      return g'^a.val,
     commit := fun h m =>  --commit h m g,
     do
       let r ← PMF.uniformOfFintype (ZMod q)
-      return (g^m.val * h^r.val, r),
-    verify := fun h m c o => if c = g^m.val * h^o.val then 1 else 0  --verify h m c o g
+      return (g'^m.val * h^r.val, r),
+    verify := fun h m c o => if c = g'^m.val * h^o.val then 1 else 0  --verify h m c o g
   }
 
   noncomputable def adversary
@@ -181,3 +193,5 @@ theorem Pedersen.computational_binding :
     comp_binding_game (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
   intro G _ _ _ g q _ hq_prime ε G_card_q hg_gen hdlog A
   exact le_trans (binding_as_hard_dlog G g q hq_prime ε G_card_q hg_gen A) (hdlog (Pedersen.adversary G q A))
+
+end public_parameters
