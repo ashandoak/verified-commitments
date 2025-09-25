@@ -6,6 +6,9 @@ import Mathlib.Data.ZMod.Defs
 import VerifiedCommitments.«commitment-scheme»
 import VerifiedCommitments.dlog
 
+-- temporary
+import VerifiedCommitments.scratch_api
+
 
 -- Helper lemma
 lemma ZMod.eq_iff_val_modEq (n : ℕ) [NeZero n] (a b : ZMod n) : a = b ↔ a.val ≡ b.val [MOD n] := by
@@ -115,14 +118,15 @@ lemma binding_as_hard_dlog
     (hg_gen : orderOf g = Fintype.card G)
     (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))) :
     comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ DLog.experiment G g q hq_prime (DLog.adversary' G q A) 1 := by
-  unfold DLog.experiment
-  unfold comp_binding_game'
-  unfold Pedersen.scheme
-  unfold DLog.adversary'
+  --unfold DLog.experiment
+  --unfold comp_binding_game'
+  simp only [DLog.experiment, comp_binding_game', Pedersen.scheme, DLog.adversary']
+  --unfold Pedersen.scheme
+  --unfold DLog.adversary'
   simp only [bind_pure_comp, ite_eq_left_iff, zero_ne_one, imp_false, Decidable.not_not, ne_eq,
     bind_map_left, ite_not, map_bind]
   congr! 5 with x ⟨c, m, m', o, o'⟩
-  simp only
+  simp
   split_ifs
   · sorry -- this is a case I want to skip
   rename_i ho
@@ -208,12 +212,12 @@ theorem Pedersen.computational_binding :
 
 
 -- Incomplete
-theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-  (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q),
-  perfect_hiding (Pedersen.scheme G g q hq_prime) := by
-  intro G _ _ _ _ g q _ hq_prime
-  unfold _root_.perfect_hiding
-  intros m m' c
-  unfold do_commit
-  unfold Pedersen.scheme
-  congr!
+-- theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
+--   (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q),
+--   perfect_hiding (Pedersen.scheme G g q hq_prime) := by
+--   intro G _ _ _ _ g q _ hq_prime
+--   unfold _root_.perfect_hiding
+--   intros m m' c
+--   unfold do_commit
+--   unfold Pedersen.scheme
+--   congr!
