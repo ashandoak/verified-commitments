@@ -3,6 +3,7 @@ import Mathlib.Probability.ProbabilityMassFunction.Monad
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
 import Mathlib.Probability.Distributions.Uniform
 import Mathlib.Data.ZMod.Defs
+import Mathlib.Data.ZMod.Basic
 import VerifiedCommitments.«commitment-scheme»
 import VerifiedCommitments.dlog
 
@@ -219,3 +220,83 @@ theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic
   -- unfold Pedersen.scheme
   congr! with m m' c o o'
   sorry
+
+
+
+-- Define the multiplicative subset of Z_q (Z_q without 0)
+def ZModMult (q : ℕ) [NeZero q] := {a : ZMod q // a ≠ 0}
+
+-- instance {q : ℕ} [Fact (Nat.Prime q)] : Inv (ZModMult q) where
+--   inv a := ⟨a.val⁻¹, inv_ne_zero a.property⟩
+
+-- Helper function to extract the value from ZModMult
+def val {q : ℕ} [NeZero q] (a : ZModMult q) : ZMod q := a.val
+
+
+theorem Int.natMod_eq_sub (x w : Int) (h : w ≠ 0) : Int.natMod x w = x - w * (x / w) := by
+  plausible
+
+variable {G: Type} [Fintype G] [Group G]
+variable (q : ℕ) [Fact (Nat.Prime q)]
+variable (G_card_q : Fintype.card G = q)
+variable (g : G) (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g) -- replace with is_cyclic G and is_generator G
+variable (hg : Subgroup.zpowers g = ⊤)
+variable [IsCyclic G]
+include G_card_q
+include g_gen_G
+
+lemma exp_bij (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod q) => g^((m + (val a) * r : ZMod q).val : ℤ) := by
+  apply (Fintype.bijective_iff_surjective_and_card _).mpr
+  simp [G_card_q]
+  intro y
+  obtain ⟨k, hk⟩ := g_gen_G y
+  simp only at hk
+  simp only
+
+  let k' : ZMod q := (k : ZMod q)
+  have hk' : g ^ (k'.val : ℤ) = y := by
+    rw [←hk]
+    simp only [ZMod.natCast_val]
+    rw [ZMod.coe_intCast]
+    rw [← G_card_q]
+    have h_ordg : orderOf g = q := by
+      apply orderOf_eq_prime
+      · rw [←G_card_q]
+        apply pow_card_eq_one
+      have g_ne_one : g ≠ 1 := by
+        by_contra hg
+        subst hg
+        rw [Subgroup.zpowers_one_eq_bot] at g_gen_G
+        simp_rw [Subgroup.mem_bot] at g_gen_G
+        have card_G_one : Fintype.card G = 1 := by
+          rw [Fintype.card_eq_one_iff]
+          subst hk G_card_q
+          simp_all only [implies_true, exists_const]
+        rw [card_G_one] at G_card_q
+        have q_prime : Nat.Prime q := Fact.out
+        have : 1 < q := Nat.Prime.one_lt (Fact.out)
+        grind
+      exact g_ne_one
+    rw [@zpow_mod_card]
+
+  let a_unit := Units.mk0 (a.val : ZMod q) a.2
+  let r : ZMod q := (a_unit⁻¹ : ZMod q) * (k' - m)
+  have h_mod : (m + a_unit * r) = k' := by
+    subst r
+    rw [IsUnit.mul_inv_cancel_left (Exists.intro a_unit rfl) (k' - m)]
+    simp
+
+  have h_pow : g^((m + a_unit * r).val : ℤ) = y := by
+    rw [←hk']
+    subst r
+    rw [h_mod]
+
+  rw [←ZMod.cast_eq_val] at h_pow -- Transfer ↑ and .val back to .cast
+  exact Exists.intro (r) h_pow
+
+
+lemma pedersen_uniform_for_fixed_a
+  {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
+  (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c }) / (Finset.card ( (⊤ : Finset G) ) : ℚ)
+  = 1 / (Fintype.card G) := by
+    sorry
