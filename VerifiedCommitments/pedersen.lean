@@ -226,22 +226,14 @@ theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic
 -- Define the multiplicative subset of Z_q (Z_q without 0)
 def ZModMult (q : ℕ) [NeZero q] := {a : ZMod q // a ≠ 0}
 
--- instance {q : ℕ} [Fact (Nat.Prime q)] : Inv (ZModMult q) where
---   inv a := ⟨a.val⁻¹, inv_ne_zero a.property⟩
-
 -- Helper function to extract the value from ZModMult
 def val {q : ℕ} [NeZero q] (a : ZModMult q) : ZMod q := a.val
 
 
-theorem Int.natMod_eq_sub (x w : Int) (h : w ≠ 0) : Int.natMod x w = x - w * (x / w) := by
-  plausible
-
 variable {G: Type} [Fintype G] [Group G]
 variable (q : ℕ) [Fact (Nat.Prime q)]
 variable (G_card_q : Fintype.card G = q)
-variable (g : G) (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g) -- replace with is_cyclic G and is_generator G
-variable (hg : Subgroup.zpowers g = ⊤)
-variable [IsCyclic G]
+variable (g : G) (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g)
 include G_card_q
 include g_gen_G
 
