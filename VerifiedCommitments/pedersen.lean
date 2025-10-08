@@ -286,9 +286,38 @@ lemma exp_bij (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod q
   rw [←ZMod.cast_eq_val] at h_pow -- Transfer ↑ and .val back to .cast
   exact Exists.intro (r) h_pow
 
-
 lemma pedersen_uniform_for_fixed_a
-  {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
-  (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c }) / (Finset.card ( (⊤ : Finset G) ) : ℚ)
-  = 1 / (Fintype.card G) := by
-    sorry
+   {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
+   (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c }) / (Finset.card ( (⊤ : Finset G) ) : ℚ)
+   = 1 / (Fintype.card G) := by
+    have h_bij := exp_bij q G_card_q g g_gen_G ⟨a, ha⟩ m
+    have h_card : Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } = 1 := by
+      rw [Finset.card_eq_one]
+      obtain ⟨r, hr⟩ := h_bij.surjective c
+      use r
+      ext t
+      simp only [Finset.mem_singleton, Finset.mem_filter, Finset.mem_univ, true_and]
+      constructor
+      · intro ht
+        have : g ^ ((m + a * t : ZMod q).val : ℤ) = g ^ ((m + a * r : ZMod q).val : ℤ) := by
+          rw [ht, ← hr]
+          simp only [val]
+        exact h_bij.injective this
+      · intro ht
+        rw [ht, ← hr]
+        simp only [val]
+    rw [h_card]
+    exact rfl
+
+-- lemma pedersen_uniform_for_fixed_a'
+--   {a : ZMod q} (ha : a ≠ 0) (h : G) (m : ZMod q) [DecidableEq G] (c : G) :
+-- CommitmentScheme.commit h m) c = 1/q := by sorry--
+
+-- Temporary?
+variable [IsCyclic G] [DecidableEq G] (hq_prime : Nat.Prime q)
+
+lemma pedersen_commitment_uniform (m : ZMod q) [DecidableEq G] (c : G) :
+  (do
+    let h ← (Pedersen.scheme G g q hq_prime).setup
+    let r ← PMF.uniformOfFintype (ZMod q)
+    return g^m.val * h^r.val : PMF G) c = 1 / Fintype.card G := by sorry
