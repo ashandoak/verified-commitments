@@ -9,6 +9,8 @@ import VerifiedCommitments.dlog
 
 -- temporary
 import VerifiedCommitments.scratch_api
+import VerifiedCommitments.«scratch-skip-bind»
+-- set_option maxHeartbeats 0
 
 
 -- Helper lemma
@@ -208,19 +210,6 @@ theorem Pedersen.computational_binding :
   exact le_trans (binding_as_hard_dlog G g q hq_prime ε G_card_q hg_gen A) (hdlog (DLog.adversary' G q A))
 
 
--- Incomplete
-theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-  (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q),
-  perfect_hiding (Pedersen.scheme G g q hq_prime) := by
-  intro G _ _ _ _ g q _ hq_prime
-  simp [_root_.perfect_hiding, do_commit, Pedersen.scheme]
-  -- unfold _root_.perfect_hiding
-  -- intros m m' c
-  -- unfold do_commit
-  -- unfold Pedersen.scheme
-  congr! with m m' c o o'
-  sorry
-
 
 
 -- Define the multiplicative subset of Z_q (Z_q without 0)
@@ -237,6 +226,19 @@ variable (g : G) (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g)
 include G_card_q
 include g_gen_G
 
+lemma ordg_eq_q : orderOf g = q := by
+  have h_card_zpow : Fintype.card (Subgroup.zpowers g) = orderOf g := Fintype.card_zpowers
+    -- zpowers g has the same cardinality as G since g generates G
+  have h_card_eq : Fintype.card (Subgroup.zpowers g) = Fintype.card G := by
+      -- Every element of G is in zpowers g, so they're in bijection
+    have : Function.Bijective (Subtype.val : Subgroup.zpowers g → G) := by
+      constructor
+      · exact Subtype.val_injective
+      · intro x
+        use ⟨x, g_gen_G x⟩
+    exact Fintype.card_of_bijective this
+  rw [← h_card_zpow, h_card_eq, G_card_q]
+
 lemma exp_bij (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod q) => g^((m + (val a) * r : ZMod q).val : ℤ) := by
   apply (Fintype.bijective_iff_surjective_and_card _).mpr
   simp [G_card_q]
@@ -251,24 +253,6 @@ lemma exp_bij (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod q
     simp only [ZMod.natCast_val]
     rw [ZMod.coe_intCast]
     rw [← G_card_q]
-    have h_ordg : orderOf g = q := by
-      apply orderOf_eq_prime
-      · rw [←G_card_q]
-        apply pow_card_eq_one
-      have g_ne_one : g ≠ 1 := by
-        by_contra hg
-        subst hg
-        rw [Subgroup.zpowers_one_eq_bot] at g_gen_G
-        simp_rw [Subgroup.mem_bot] at g_gen_G
-        have card_G_one : Fintype.card G = 1 := by
-          rw [Fintype.card_eq_one_iff]
-          subst hk G_card_q
-          simp_all only [implies_true, exists_const]
-        rw [card_G_one] at G_card_q
-        have q_prime : Nat.Prime q := Fact.out
-        have : 1 < q := Nat.Prime.one_lt (Fact.out)
-        grind
-      exact g_ne_one
     rw [@zpow_mod_card]
 
   let a_unit := Units.mk0 (a.val : ZMod q) a.2
@@ -309,15 +293,255 @@ lemma pedersen_uniform_for_fixed_a
     rw [h_card]
     exact rfl
 
--- lemma pedersen_uniform_for_fixed_a'
---   {a : ZMod q} (ha : a ≠ 0) (h : G) (m : ZMod q) [DecidableEq G] (c : G) :
--- CommitmentScheme.commit h m) c = 1/q := by sorry--
+lemma pedersen_uniform_for_fixed_a'
+  {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
+  Finset.card { r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val } = 1 := by
+    have h_ratio := pedersen_uniform_for_fixed_a q G_card_q g g_gen_G ha m c
+    have h_card : Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } = 1 := by
+      have h_pos : (0 : ℚ) < Finset.card (⊤ : Finset G) := by simp; exact Fintype.card_pos
+      have h_eq : (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } : ℚ) =
+             (Finset.card (⊤ : Finset G) : ℚ) / (Fintype.card G : ℚ) := by
+        grind --only [= Finset.card_univ, usr Finset.card_filter_le, cases Or]
+      have h_top : Finset.card (⊤ : Finset G) = Fintype.card G := by rfl
+      have : (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } : ℚ) = (1 : ℚ) := by
+        grind
+      exact Nat.cast_injective (R := ℚ) this
+    convert h_card using 2
+    ext t
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+    have key : g ^ ((m + a * t).val : ℤ) = g ^ m.val * (g ^ a.val) ^ t.val := by
+      have : (g ^ m.val * (g ^ a.val) ^ t.val : G) = g ^ m.val * g ^ (a.val * t.val) := by
+        rw [← pow_mul]
+      rw [this]
+      rw [← pow_add]
+      have h_order : orderOf g = q := by
+        · expose_names; exact ordg_eq_q q G_card_q g g_gen_G
+      have h_val_eq : (m + a * t).val = (m.val + a.val * t.val) % q := by
+        have h_eq : (m + a * t : ZMod q) = ((m.val + a.val * t.val) : ℕ) := by
+          simp only [Nat.cast_add, ZMod.natCast_val, ZMod.cast_id', id_eq, Nat.cast_mul]
+        rw [h_eq, ZMod.val_natCast]
+      rw [h_val_eq]
+      show g ^ (((m.val + a.val * t.val) % q : ℕ) : ℤ) = g ^ (m.val + a.val * t.val : ℕ)
+      rw [← zpow_natCast]
+      have : (g : G) ^ (((m.val + a.val * t.val) % q : ℕ) : ℤ) = g ^ ((m.val + a.val * t.val : ℕ) : ℤ) := by
+        have : ((m.val + a.val * t.val : ℕ) : ℤ) % (orderOf g : ℤ) = ((m.val + a.val * t.val) % q : ℕ) := by
+          grind
+        rw [← this, zpow_mod_orderOf]
+      assumption
+    rw [key, eq_comm]
+
 
 -- Temporary?
 variable [IsCyclic G] [DecidableEq G] (hq_prime : Nat.Prime q)
 
+-- This is presumably a more convenient approach rather than including the do-block directly in a the type of pedersen_commitment_uniform
+noncomputable def generate_a : PMF $ ZMod q :=
+  do
+    let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
+    have h_nonempty : nonzero_elements.Nonempty := by
+      have one_ne_zero : (1 : ZMod q) ≠ 0 := by
+        intro h
+        have : q ∣ 1 := by
+          simp only [Nat.dvd_one]
+          exact ZMod.one_eq_zero_iff.mp h
+        have q_eq_one : q = 1 := Nat.dvd_one.1 this
+        exact (Nat.Prime.ne_one hq_prime q_eq_one)
+      have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
+        apply Finset.mem_erase.mpr
+        constructor
+        · exact one_ne_zero
+        · simp
+      exact ⟨1, mem1⟩
+    let a ← PMF.uniformOfFinset nonzero_elements h_nonempty
+    return a
+
+-- lemma sum_indicator_uniform {α : Type} [Fintype α] (p : α → Prop) [DecidablePred p] (h : (Finset.filter p Finset.univ).card = 1) :
+--   ∑' (x : α), if p x then (↑(Fintype.card α))⁻¹ else 0 = (↑(Fintype.card α))⁻¹ := by
+--     sorry
+
+
+lemma pedersen_commitment_uniform' (m : ZMod q) [DecidableEq G] (c : G) :
+  (PMF.bind (generate_a q hq_prime)
+    (fun a => PMF.bind (PMF.uniformOfFintype (ZMod q))
+      (fun r => PMF.pure (g^m.val * (g^a.val)^r.val)))) c = 1 / Fintype.card G := by
+      -- The key insight: for each non-zero a, the inner distribution is uniform over G
+      -- We'll show that the result doesn't depend on which a we sample
+      have h_uniform_inner : ∀ (a : ZMod q), a ≠ 0 →
+        (PMF.bind (PMF.uniformOfFintype (ZMod q))
+          (fun r => PMF.pure (g^m.val * (g^a.val)^r.val))) c = 1 / Fintype.card G := by
+        intro a ha
+        rw [PMF.bind_apply]
+        conv_lhs => arg 1; ext r; rw [PMF.pure_apply]
+        simp only [PMF.uniformOfFintype_apply, ZMod.card]
+        -- Need to show: ∑' r, (1/q) * (if c = g^m.val * (g^a.val)^r.val then 1 else 0) = 1 / |G|
+        -- Since |G| = q, this reduces to showing the sum of indicators equals 1
+        rw [ENNReal.tsum_mul_left, G_card_q, one_div]
+        -- Now need to show: q^{-1} * (sum of indicators) = q^{-1}
+        -- Equivalently: sum of indicators = 1
+        -- Convert to finset sum
+        rw [tsum_eq_sum (s := {r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val}.toFinset)]
+        swap
+        · simp only [Set.toFinset_setOf, Finset.mem_filter, Finset.mem_univ, true_and,
+          ite_eq_right_iff, one_ne_zero, imp_false, imp_self, implies_true]--intro r hr
+        -- The sum equals the cardinality
+        trans ((q : ENNReal)⁻¹ * ↑{r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val}.toFinset.card)
+        · congr 1
+          trans (∑ b ∈ {r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val}.toFinset, (1 : ENNReal))
+          · apply Finset.sum_congr rfl
+            intro b hb
+            simp only [Set.mem_toFinset, Set.mem_setOf_eq] at hb
+            simp [hb]
+          · rw [Finset.sum_const, nsmul_eq_mul, mul_one]
+        rw [Set.toFinset_card]
+        -- Now use pedersen_uniform_for_fixed_a to show the cardinality is 1
+        -- The cardinality of the set is 1, so q^{-1} * 1 = q^{-1}
+        have h_card : Fintype.card {r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val} = 1 := by
+          have h_finset : ({r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val} : Set (ZMod q)).toFinset.card = 1 := by
+            convert pedersen_uniform_for_fixed_a' q G_card_q g g_gen_G ha m c using 2
+            ext r
+            simp only [Set.toFinset_setOf, Finset.mem_filter, Finset.mem_univ, true_and]
+          have : Fintype.card {r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val} =
+                 ({r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val} : Set (ZMod q)).toFinset.card := by
+            simp only [Set.toFinset_card]
+          grind only
+        simp_all
+
+      -- Now use bind_skip_const' since the inner bind always gives the same distribution
+      have h_uniform_inner_gen : ∀ (a : ZMod q) (c' : G), a ≠ 0 →
+        (PMF.bind (PMF.uniformOfFintype (ZMod q))
+          (fun r => PMF.pure (g^m.val * (g^a.val)^r.val))) c' = 1 / Fintype.card G := by
+        intro a c' ha
+        -- This is the same proof as h_uniform_inner but for c' instead of c
+        rw [PMF.bind_apply]
+        conv_lhs => arg 1; ext r; rw [PMF.pure_apply]
+        simp only [PMF.uniformOfFintype_apply, ZMod.card]
+        rw [ENNReal.tsum_mul_left, G_card_q, one_div]
+        rw [tsum_eq_sum (s := {r : ZMod q | c' = g ^ m.val * (g ^ a.val) ^ r.val}.toFinset)]
+        swap
+        · intro r hr
+          simp only [Set.mem_toFinset, Set.mem_setOf_eq] at hr
+          simp [hr]
+        trans ((q : ENNReal)⁻¹ * ↑{r : ZMod q | c' = g ^ m.val * (g ^ a.val) ^ r.val}.toFinset.card)
+        · congr 1
+          trans (∑ b ∈ {r : ZMod q | c' = g ^ m.val * (g ^ a.val) ^ r.val}.toFinset, (1 : ENNReal))
+          · apply Finset.sum_congr rfl
+            intro b hb
+            simp only [Set.mem_toFinset, Set.mem_setOf_eq] at hb
+            simp [hb]
+          · rw [Finset.sum_const, nsmul_eq_mul, mul_one]
+        rw [Set.toFinset_card]
+        have h_card : Fintype.card {r : ZMod q | c' = g ^ m.val * (g ^ a.val) ^ r.val} = 1 := by
+          have h_finset : ({r : ZMod q | c' = g ^ m.val * (g ^ a.val) ^ r.val} : Set (ZMod q)).toFinset.card = 1 := by
+            convert pedersen_uniform_for_fixed_a' q G_card_q g g_gen_G ha m c' using 2
+            ext r
+            simp [Set.mem_toFinset]
+          have : Fintype.card {r : ZMod q | c' = g ^ m.val * (g ^ a.val) ^ r.val} =
+                 ({r : ZMod q | c' = g ^ m.val * (g ^ a.val) ^ r.val} : Set (ZMod q)).toFinset.card := by
+            simp only [Set.toFinset_card]
+          rw [this, h_finset]
+        rw [h_card]
+        simp
+      have h_const : ∀ a, a ∈ ((Finset.univ : Finset (ZMod q)).erase 0) →
+        (PMF.bind (PMF.uniformOfFintype (ZMod q))
+          (fun r => PMF.pure (g^m.val * (g^a.val)^r.val))) = PMF.uniformOfFintype G := by
+        intro a ha
+        ext c'
+        simp [Finset.mem_erase] at ha
+        rw [h_uniform_inner_gen a c' ha]
+        simp [PMF.uniformOfFintype_apply]
+      rw [generate_a]
+      rw [bind_pure_comp]
+      rw [id_map']
+      -- The bind of uniformOfFinset with a function that's constant on the finset equals that constant
+      let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
+      have h_nonempty : nonzero_elements.Nonempty := by
+        have one_ne_zero : (1 : ZMod q) ≠ 0 := by
+          intro h
+          have : q ∣ 1 := by
+            simp only [Nat.dvd_one]
+            exact ZMod.one_eq_zero_iff.mp h
+          have q_eq_one : q = 1 := Nat.dvd_one.1 this
+          exact (Nat.Prime.ne_one hq_prime q_eq_one)
+        have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
+          apply Finset.mem_erase.mpr
+          constructor
+          · exact one_ne_zero
+          · simp
+        exact ⟨1, mem1⟩
+      have : (PMF.uniformOfFinset nonzero_elements h_nonempty).bind
+          (fun a => (PMF.uniformOfFintype (ZMod q)).bind fun r => PMF.pure (g^m.val * (g^a.val)^r.val)) =
+        PMF.uniformOfFintype G := by
+        ext x
+        rw [PMF.bind_apply]
+        simp only [PMF.uniformOfFinset_apply]
+        trans (∑' a, (if a ∈ nonzero_elements then (nonzero_elements.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x else 0))
+        · apply tsum_congr
+          intro a
+          by_cases ha : a ∈ nonzero_elements
+          · simp only [ha, ite_true]
+            rw [h_const a ha]
+          · simp only [ha, ite_false, zero_mul]
+        · rw [tsum_eq_sum (s := nonzero_elements)]
+          · have : ∑ b ∈ nonzero_elements, (if b ∈ nonzero_elements then (nonzero_elements.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x else 0) =
+                   ∑ b ∈ nonzero_elements, (nonzero_elements.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x := by
+              apply Finset.sum_congr rfl
+              intro b hb
+              simp only [hb, ite_true]
+            rw [this, Finset.sum_const, nsmul_eq_mul, PMF.uniformOfFintype_apply]
+            -- Goal: nonzero_elements.card * ((nonzero_elements.card)⁻¹ * (Fintype.card G)⁻¹) = (Fintype.card G)⁻¹
+            calc (nonzero_elements.card : ENNReal) * ((nonzero_elements.card : ENNReal)⁻¹ * (Fintype.card G : ENNReal)⁻¹)
+              _ = ((nonzero_elements.card : ENNReal) * (nonzero_elements.card : ENNReal)⁻¹) * (Fintype.card G : ENNReal)⁻¹ := by
+                ring_nf
+              _ = 1 * (Fintype.card G : ENNReal)⁻¹ := by
+                congr 1
+                apply ENNReal.mul_inv_cancel
+                · simp
+                  exact Finset.Nonempty.ne_empty h_nonempty
+                · exact ENNReal.natCast_ne_top _
+              _ = (Fintype.card G : ENNReal)⁻¹ := by rw [one_mul]
+          · intro a ha
+            simp [ha]
+      conv_lhs => rw [this]
+      simp [PMF.uniformOfFintype_apply]
+
+
+
 lemma pedersen_commitment_uniform (m : ZMod q) [DecidableEq G] (c : G) :
   (do
-    let h ← (Pedersen.scheme G g q hq_prime).setup
+    let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
+    have h_nonempty : nonzero_elements.Nonempty := by
+      have one_ne_zero : (1 : ZMod q) ≠ 0 := by
+        intro h
+        have : q ∣ 1 := by
+          simp only [Nat.dvd_one]
+          exact ZMod.one_eq_zero_iff.mp h
+        have q_eq_one : q = 1 := Nat.dvd_one.1 this
+        exact (Nat.Prime.ne_one hq_prime q_eq_one)
+      have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
+        apply Finset.mem_erase.mpr
+        constructor
+        · exact one_ne_zero
+        · simp
+      exact ⟨1, mem1⟩
+    let a ← PMF.uniformOfFinset nonzero_elements h_nonempty
     let r ← PMF.uniformOfFintype (ZMod q)
-    return g^m.val * h^r.val : PMF G) c = 1 / Fintype.card G := by sorry
+    return g^m.val * (g^a.val)^r.val : PMF G) c = 1 / Fintype.card G := by
+      sorry
+
+
+theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
+  (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q),
+  perfect_hiding (Pedersen.scheme G g q hq_prime) := by
+    intros G _ _ _ _ g q _ hq_prime
+    simp only [Pedersen.scheme, _root_.perfect_hiding, do_commit]
+    simp only [bind_pure_comp, Functor.map_map, bind_map_left]
+    intro m m' c
+    rw [bind, Functor.map]
+    simp only [PMF]
+    rw [Monad.toBind, PMF.instMonad]
+
+    sorry
+
+
+-- Collection of uniform distrbutions and need to choose uniformly among them
+-- Seems that this is the work of a bind to map across two distributions
