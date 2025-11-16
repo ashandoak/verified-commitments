@@ -1,223 +1,6 @@
-import Mathlib.Probability.ProbabilityMassFunction.Basic
-import Mathlib.Probability.ProbabilityMassFunction.Monad
-import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import Mathlib.Probability.Distributions.Uniform
-import Mathlib.Data.ZMod.Defs
-import Mathlib.Data.ZMod.Basic
-import VerifiedCommitments.«commitment-scheme»
-import VerifiedCommitments.dlog
-
--- temporary
-import VerifiedCommitments.scratch_api
-import VerifiedCommitments.«scratch-skip-bind»
--- set_option maxHeartbeats 0
-
-
--- Helper lemma
-lemma ZMod.eq_iff_val_modEq (n : ℕ) [NeZero n] (a b : ZMod n) : a = b ↔ a.val ≡ b.val [MOD n] := by
-  constructor
-  · intro h
-    rw [h]
-  · intro h_congr
-    -- Convert to integer cast equality
-    have h1 : (a.val : ZMod n) = a := ZMod.natCast_zmod_val a
-    have h2 : (b.val : ZMod n) = b := ZMod.natCast_zmod_val b
-    rw [← h1, ← h2]
-    rw [ZMod.eq_iff_modEq_nat]
-    exact h_congr
-
-
-namespace Pedersen
-
-  noncomputable def scheme
-    (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-      (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) :
-      CommitmentScheme (ZMod q) G (ZMod q) G := {
-    setup := --setup q hq g,
-    do
-      let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
-      have h_nonempty : nonzero_elements.Nonempty := by
-        have one_ne_zero : (1 : ZMod q) ≠ 0 := by
-          intro h
-          have : q ∣ 1 := by
-            simp only [Nat.dvd_one]
-            exact ZMod.one_eq_zero_iff.mp h
-          have q_eq_one : q = 1 := Nat.dvd_one.1 this
-          exact (Nat.Prime.ne_one hq_prime q_eq_one)
-        have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
-          apply Finset.mem_erase.mpr
-          constructor
-          · exact one_ne_zero
-          · simp
-        exact ⟨1, mem1⟩
-      let a ← PMF.uniformOfFinset nonzero_elements h_nonempty
-      return g^a.val,
-    commit := fun h m =>  --commit h m g,
-    do
-      let r ← PMF.uniformOfFintype (ZMod q)
-      return ⟨g^m.val * h^r.val, r⟩,
-    verify := fun h m c o => if c = g^m.val * h^o.val then 1 else 0  --verify h m c o g
-  }
-
-end Pedersen
-
-namespace DLog
-
-noncomputable def experiment
-  (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q)
-    (A' : G → PMF (ZMod q)) : PMF (ZMod 2) :=
-  do
-    let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
-    have h_nonempty : nonzero_elements.Nonempty := by
-      have one_ne_zero : (1 : ZMod q) ≠ 0 := by
-        intro h
-        have : q ∣ 1 := by
-          simp only [Nat.dvd_one]
-          exact ZMod.one_eq_zero_iff.mp h
-        have q_eq_one : q = 1 := Nat.dvd_one.1 this
-        exact (Nat.Prime.ne_one hq_prime q_eq_one)
-      have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
-        apply Finset.mem_erase.mpr
-        constructor
-        · exact one_ne_zero
-        · simp
-      exact ⟨1, mem1⟩
-    let x ← PMF.uniformOfFinset nonzero_elements h_nonempty
-    let h := g^x.val
-    let x' ← A' h
-    pure (if g^x'.val = h then 1 else 0)
-
-  noncomputable def adversary
-    (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G]
-      (q : ℕ) [NeZero q]
-      (A : G → PMF (G × ZMod q × ZMod q × ZMod q × ZMod q))
-      (h : G) : PMF (ZMod q) :=
-    do
-      let (_c, m, m', o, o') ← A h
-      if o ≠ o' then
-        return ((m - m') * (o' - o)⁻¹)
-      else
-        PMF.uniformOfFintype (ZMod q)
-
-  noncomputable def adversary'
-    (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G]
-      (q : ℕ) [NeZero q]
-      (A' : G → PMF (Adversary.guess (ZMod q) G (ZMod q)))
-      (h : G) : PMF (ZMod q) :=
-    do
-      let guess ← A' h
-      if guess.o ≠ guess.o' then
-        return ((guess.m - guess.m') * (guess.o' - guess.o)⁻¹)
-      else
-        PMF.uniformOfFintype (ZMod q)
-
-end DLog
-
-lemma binding_as_hard_dlog
-  (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] (hq_prime : Nat.Prime q) (ε : ENNReal)
-    (G_card_q : Fintype.card G = q)
-    (hg_gen : orderOf g = Fintype.card G)
-    (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))) :
-    comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ DLog.experiment G g q hq_prime (DLog.adversary' G q A) 1 := by
-  simp only [DLog.experiment, comp_binding_game', Pedersen.scheme, DLog.adversary']
-  simp only [bind_pure_comp, ite_eq_left_iff, zero_ne_one, imp_false, Decidable.not_not, ne_eq,
-    bind_map_left, ite_not, map_bind]
-  congr! 5 with x ⟨c, m, m', o, o'⟩
-  simp
-  split_ifs
-  · sorry -- this is a case I want to skip
-  rename_i ho
-  rename_i h
-  obtain ⟨h1, h2, h3⟩ := h
-  rw [h1] at h2
-  simp only [map_pure]
-  have h_noo' : o' ≠ o := by exact fun a ↦ ho (id (Eq.symm a))
-  have h_coprime : (o' - o).val.Coprime q := by
-    cases' Nat.coprime_or_dvd_of_prime hq_prime (o' - o).val with h_cop h_dvd
-    · exact Nat.coprime_comm.mp h_cop
-    · exfalso
-      have h_zero : o' - o = 0 := by
-        rw [← ZMod.val_eq_zero]
-        have h_mod_zero : (o' - o).val % q = 0 := Nat.mod_eq_zero_of_dvd h_dvd
-        have h_val_bound : (o' - o).val < q := ZMod.val_lt (o' - o)
-        exact Nat.eq_zero_of_dvd_of_lt h_dvd h_val_bound
-      exact h_noo' (eq_of_sub_eq_zero h_zero)
-
-  have h_ex_inv : ∃ y, ↑(o' - o).val * y ≡ 1 [ZMOD q] := by apply Int.mod_coprime h_coprime
-
-  have h_ord : orderOf g = q := by
-    rw [← G_card_q]; exact hg_gen
-
-  have h_pow : g ^ (m.val + x.val * o.val) = g ^ (m'.val + x.val * o'.val) := by
-    simp [←pow_mul, ←pow_add] at h2
-    exact h2
-
-  have h_congr_nat : m.val + x.val * o.val ≡ m'.val + x.val * o'.val [MOD q] := by
-    simpa [h_ord] using (pow_eq_pow_iff_modEq.mp h_pow)
-
-  have h_zmod : (m + x * o : ZMod q) = (m' + x * o' : ZMod q) := by
-    have eq_cast : ((m.val + x.val * o.val : ℕ) : ZMod q) =
-                  ((m'.val + x.val * o'.val : ℕ) : ZMod q) :=
-      (ZMod.eq_iff_modEq_nat _).mpr h_congr_nat
-    simp at eq_cast
-    exact eq_cast
-
-  have h_lin : x * (o' - o) = m - m' := by grind
-
-  have h_unit : o' - o ≠ 0 := sub_ne_zero.mpr h_noo'
-
-  have h_solve_x : x = (m - m') * (o' - o)⁻¹ := by
-     calc x = x * 1                                 := by rw [mul_one]
-       _ = x * ((o' - o) * (o' - o)⁻¹)              := by
-        haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩
-        rw [← one_mul x]
-        congr 1
-        have h_field_inv : (o' - o) * (o' - o)⁻¹ = 1 := by
-          apply Field.mul_inv_cancel
-          exact h_unit
-        exact h_field_inv.symm
-       _ = (x * (o' - o)) * (o' - o)⁻¹              := by rw [mul_assoc]
-       _ = (m - m') * (o' - o)⁻¹                    := by rw [h_lin]
-
-  have h_congr_final : ((m - m') * (o' - o)⁻¹).val ≡ x.val [MOD q] := by
-    have h1 : (((m - m') * (o' - o)⁻¹).val : ZMod q) = (m - m') * (o' - o)⁻¹ :=
-      ZMod.natCast_zmod_val ((m - m') * (o' - o)⁻¹)
-    have h2 : (x.val : ZMod q) = x := ZMod.natCast_zmod_val x
-    rw [← ZMod.eq_iff_modEq_nat]
-    rw [h1, h2]
-    exact h_solve_x.symm
-
-  have h_eq : g ^ ((m - m') * (o' - o)⁻¹).val = g ^ x.val :=
-    (pow_eq_pow_iff_modEq.mpr (by rwa [h_ord]))
-
-  rw [h_eq]
-  simp only [↓reduceIte]
-  · sorry -- cases I want to skip
-  · sorry
-
-
-theorem Pedersen.computational_binding :
-  ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] (hq_prime : Nat.Prime q) (ε : ENNReal)
-    (G_card_q : Fintype.card G = q)
-    (hg_gen : orderOf g = Fintype.card G),
-    (∀ (A : G → PMF (ZMod q)), DLog.experiment G g q hq_prime A 1 ≤ ε) →
-    (∀ (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))),
-    comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
-  intro G _ _ _ _ g q _ _ hq_prime ε G_card_q hg_gen hdlog A
-  exact le_trans (binding_as_hard_dlog G g q hq_prime ε G_card_q hg_gen A) (hdlog (DLog.adversary' G q A))
-
-
-
-
--- Define the multiplicative subset of Z_q (Z_q without 0)
-def ZModMult (q : ℕ) [NeZero q] := {a : ZMod q // a ≠ 0}
-
--- Helper function to extract the value from ZModMult
-def val {q : ℕ} [NeZero q] (a : ZModMult q) : ZMod q := a.val
-
+import VerifiedCommitments.PedersenScheme
+import VerifiedCommitments.ZModUtil
+import Mathlib -- Would like to trim down this import but the Units.mk0 (a.val : ZMod q) a.2 line is a problem
 
 variable {G: Type} [Fintype G] [Group G]
 variable (q : ℕ) [Fact (Nat.Prime q)]
@@ -337,28 +120,12 @@ variable [IsCyclic G] [DecidableEq G] (hq_prime : Nat.Prime q)
 -- This is presumably a more convenient approach rather than including the do-block directly in a the type of pedersen_commitment_uniform
 noncomputable def generate_a : PMF $ ZMod q :=
   do
-    let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
-    have h_nonempty : nonzero_elements.Nonempty := by
-      have one_ne_zero : (1 : ZMod q) ≠ 0 := by
-        intro h
-        have : q ∣ 1 := by
-          simp only [Nat.dvd_one]
-          exact ZMod.one_eq_zero_iff.mp h
-        have q_eq_one : q = 1 := Nat.dvd_one.1 this
-        exact (Nat.Prime.ne_one hq_prime q_eq_one)
-      have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
-        apply Finset.mem_erase.mpr
-        constructor
-        · exact one_ne_zero
-        · simp
-      exact ⟨1, mem1⟩
-    let a ← PMF.uniformOfFinset nonzero_elements h_nonempty
+    let a ← PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2
     return a
 
 -- lemma sum_indicator_uniform {α : Type} [Fintype α] (p : α → Prop) [DecidablePred p] (h : (Finset.filter p Finset.univ).card = 1) :
 --   ∑' (x : α), if p x then (↑(Fintype.card α))⁻¹ else 0 = (↑(Fintype.card α))⁻¹ := by
 --     sorry
-
 
 lemma pedersen_commitment_uniform' (m : ZMod q) [DecidableEq G] (c : G) :
   (PMF.bind (generate_a q hq_prime)
@@ -452,51 +219,36 @@ lemma pedersen_commitment_uniform' (m : ZMod q) [DecidableEq G] (c : G) :
       rw [generate_a]
       rw [bind_pure_comp]
       rw [id_map']
-      -- The bind of uniformOfFinset with a function that's constant on the finset equals that constant
-      let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
-      have h_nonempty : nonzero_elements.Nonempty := by
-        have one_ne_zero : (1 : ZMod q) ≠ 0 := by
-          intro h
-          have : q ∣ 1 := by
-            simp only [Nat.dvd_one]
-            exact ZMod.one_eq_zero_iff.mp h
-          have q_eq_one : q = 1 := Nat.dvd_one.1 this
-          exact (Nat.Prime.ne_one hq_prime q_eq_one)
-        have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
-          apply Finset.mem_erase.mpr
-          constructor
-          · exact one_ne_zero
-          · simp
-        exact ⟨1, mem1⟩
-      have : (PMF.uniformOfFinset nonzero_elements h_nonempty).bind
+
+      have : (PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2).bind
           (fun a => (PMF.uniformOfFintype (ZMod q)).bind fun r => PMF.pure (g^m.val * (g^a.val)^r.val)) =
         PMF.uniformOfFintype G := by
         ext x
         rw [PMF.bind_apply]
         simp only [PMF.uniformOfFinset_apply]
-        trans (∑' a, (if a ∈ nonzero_elements then (nonzero_elements.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x else 0))
+        trans (∑' a, (if a ∈ (nonzeroElements hq_prime).1 then ((nonzeroElements hq_prime).1.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x else 0))
         · apply tsum_congr
           intro a
-          by_cases ha : a ∈ nonzero_elements
+          by_cases ha : a ∈ (nonzeroElements hq_prime).1
           · simp only [ha, ite_true]
             rw [h_const a ha]
           · simp only [ha, ite_false, zero_mul]
-        · rw [tsum_eq_sum (s := nonzero_elements)]
-          · have : ∑ b ∈ nonzero_elements, (if b ∈ nonzero_elements then (nonzero_elements.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x else 0) =
-                   ∑ b ∈ nonzero_elements, (nonzero_elements.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x := by
+        · rw [tsum_eq_sum (s := (nonzeroElements hq_prime).1)]
+          · have : ∑ b ∈ (nonzeroElements hq_prime).1, (if b ∈ (nonzeroElements hq_prime).1 then ((nonzeroElements hq_prime).1.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x else 0) =
+                   ∑ b ∈ (nonzeroElements hq_prime).1, ((nonzeroElements hq_prime).1.card : ENNReal)⁻¹ * (PMF.uniformOfFintype G) x := by
               apply Finset.sum_congr rfl
               intro b hb
               simp only [hb, ite_true]
             rw [this, Finset.sum_const, nsmul_eq_mul, PMF.uniformOfFintype_apply]
-            -- Goal: nonzero_elements.card * ((nonzero_elements.card)⁻¹ * (Fintype.card G)⁻¹) = (Fintype.card G)⁻¹
-            calc (nonzero_elements.card : ENNReal) * ((nonzero_elements.card : ENNReal)⁻¹ * (Fintype.card G : ENNReal)⁻¹)
-              _ = ((nonzero_elements.card : ENNReal) * (nonzero_elements.card : ENNReal)⁻¹) * (Fintype.card G : ENNReal)⁻¹ := by
+            -- Goal: (nonzeroElements hq_prime).1.card * (((nonzeroElements hq_prime).1.card)⁻¹ * (Fintype.card G)⁻¹) = (Fintype.card G)⁻¹
+            calc ((nonzeroElements hq_prime).1.card : ENNReal) * (((nonzeroElements hq_prime).1.card : ENNReal)⁻¹ * (Fintype.card G : ENNReal)⁻¹)
+              _ = (((nonzeroElements hq_prime).1.card : ENNReal) * ((nonzeroElements hq_prime).1.card : ENNReal)⁻¹) * (Fintype.card G : ENNReal)⁻¹ := by
                 ring_nf
               _ = 1 * (Fintype.card G : ENNReal)⁻¹ := by
                 congr 1
                 apply ENNReal.mul_inv_cancel
                 · simp
-                  exact Finset.Nonempty.ne_empty h_nonempty
+                  exact Finset.Nonempty.ne_empty (nonzeroElements hq_prime).2
                 · exact ENNReal.natCast_ne_top _
               _ = (Fintype.card G : ENNReal)⁻¹ := by rw [one_mul]
           · intro a ha
@@ -508,22 +260,7 @@ lemma pedersen_commitment_uniform' (m : ZMod q) [DecidableEq G] (c : G) :
 
 lemma pedersen_commitment_uniform (m : ZMod q) [DecidableEq G] (c : G) :
   (do
-    let nonzero_elements := (Finset.univ : Finset (ZMod q)).erase 0
-    have h_nonempty : nonzero_elements.Nonempty := by
-      have one_ne_zero : (1 : ZMod q) ≠ 0 := by
-        intro h
-        have : q ∣ 1 := by
-          simp only [Nat.dvd_one]
-          exact ZMod.one_eq_zero_iff.mp h
-        have q_eq_one : q = 1 := Nat.dvd_one.1 this
-        exact (Nat.Prime.ne_one hq_prime q_eq_one)
-      have mem1 : (1 : ZMod q) ∈ nonzero_elements := by
-        apply Finset.mem_erase.mpr
-        constructor
-        · exact one_ne_zero
-        · simp
-      exact ⟨1, mem1⟩
-    let a ← PMF.uniformOfFinset nonzero_elements h_nonempty
+    let a ← PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2
     let r ← PMF.uniformOfFintype (ZMod q)
     return g^m.val * (g^a.val)^r.val : PMF G) c = 1 / Fintype.card G := by
       sorry
