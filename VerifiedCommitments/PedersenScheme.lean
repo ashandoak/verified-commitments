@@ -1,4 +1,4 @@
-import VerifiedCommitments.«commitment-scheme»
+import VerifiedCommitments.CommitmentScheme
 import VerifiedCommitments.dlog
 
 namespace Pedersen
