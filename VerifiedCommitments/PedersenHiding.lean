@@ -53,6 +53,48 @@ lemma exp_bij (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod q
   rw [←ZMod.cast_eq_val] at h_pow -- Transfer ↑ and .val back to .cast
   exact Exists.intro (r) h_pow
 
+lemma exp_bij' (a : ZMod q) (ha : (a.val : ZMod q) ≠ 0) (m : ZMod q) : Function.Bijective fun (r : ZMod q) => g^((m + a.val * r : ZMod q).val : ℤ) := by
+  apply (Fintype.bijective_iff_surjective_and_card _).mpr
+  simp [G_card_q]
+  intro c --So take any cc ∈ GG
+  obtain ⟨k, hk⟩ := g_gen_G c
+  simp only at hk
+  simp only
+
+  let z : ZMod q := (k : ZMod q) -- Since g is a generator we have c = g^z for some z ∈ Zq
+  have hk' : g ^ (z.val : ℤ) = c := by
+    rw [←hk]
+    simp only [ZMod.natCast_val]
+    rw [ZMod.coe_intCast]
+    rw [← G_card_q]
+    rw [@zpow_mod_card]
+
+  -- we need g^m+a^r = g^z
+  -- This is the case iff m + ar ≡ z (mod q)
+  -- This is the case iff t ≡ a^−1 * (z − m) (mod q)
+  let a_unit := Units.mk0 (a.val : ZMod q) ha
+  let r : ZMod q := (a_unit⁻¹ : ZMod q) * (z - m)
+  have h_mod : (m + a_unit * r) = z := by
+    subst r
+    rw [IsUnit.mul_inv_cancel_left (Exists.intro a_unit rfl) (z - m)]
+    simp
+
+  have h_pow : g^((m + a_unit * r).val : ℤ) = c := by
+    rw [←hk']
+    subst r
+    rw [h_mod]
+
+  rw [←ZMod.cast_eq_val] at h_pow -- Transfer ↑ and .val back to .cast
+  sorry
+  --exact Exists.intro (r) h_pow
+
+
+noncomputable def expEquiv (a : ZMod q) (ha : (a.val : ZMod q) ≠ 0) (m : ZMod q) : ZMod q ≃ G :=
+Equiv.ofBijective (fun (r : ZMod q) => g^((m + (a.val) * r : ZMod q).val : ℤ)) (exp_bij' q G_card_q g g_gen_G a ha m)
+
+variable (a' : ZMod q) (ha' : (a'.val : ZMod q) ≠ 0) (m' : ZMod q)
+#check (expEquiv q G_card_q g g_gen_G a' ha' m').invFun
+
 lemma pedersen_uniform_for_fixed_a
    {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
    (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c }) / (Finset.card ( (⊤ : Finset G) ) : ℚ)
@@ -75,6 +117,8 @@ lemma pedersen_uniform_for_fixed_a
         simp only [val]
     rw [h_card]
     exact rfl
+
+
 
 lemma pedersen_uniform_for_fixed_a'
   {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
