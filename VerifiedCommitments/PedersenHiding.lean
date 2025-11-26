@@ -22,38 +22,8 @@ lemma ordg_eq_q : orderOf g = q := by
     exact Fintype.card_of_bijective this
   rw [← h_card_zpow, h_card_eq, G_card_q]
 
-lemma exp_bij (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod q) => g^((m + (val a) * r : ZMod q).val : ℤ) := by
-  apply (Fintype.bijective_iff_surjective_and_card _).mpr
-  simp [G_card_q]
-  intro y
-  obtain ⟨k, hk⟩ := g_gen_G y
-  simp only at hk
-  simp only
 
-  let k' : ZMod q := (k : ZMod q)
-  have hk' : g ^ (k'.val : ℤ) = y := by
-    rw [←hk]
-    simp only [ZMod.natCast_val]
-    rw [ZMod.coe_intCast]
-    rw [← G_card_q]
-    rw [@zpow_mod_card]
-
-  let a_unit := Units.mk0 (a.val : ZMod q) a.2
-  let r : ZMod q := (a_unit⁻¹ : ZMod q) * (k' - m)
-  have h_mod : (m + a_unit * r) = k' := by
-    subst r
-    rw [IsUnit.mul_inv_cancel_left (Exists.intro a_unit rfl) (k' - m)]
-    simp
-
-  have h_pow : g^((m + a_unit * r).val : ℤ) = y := by
-    rw [←hk']
-    subst r
-    rw [h_mod]
-
-  rw [←ZMod.cast_eq_val] at h_pow -- Transfer ↑ and .val back to .cast
-  exact Exists.intro (r) h_pow
-
-lemma exp_bij' (a : ZMod q) (ha : (a.val : ZMod q) ≠ 0) (m : ZMod q) : Function.Bijective fun (r : ZMod q) => g^((m + a.val * r : ZMod q).val : ℤ) := by
+lemma exp_bij' (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod q) => g^((m + (val a) * r : ZMod q).val : ℤ) := by
   apply (Fintype.bijective_iff_surjective_and_card _).mpr
   simp [G_card_q]
   intro c --So take any cc ∈ GG
@@ -72,7 +42,7 @@ lemma exp_bij' (a : ZMod q) (ha : (a.val : ZMod q) ≠ 0) (m : ZMod q) : Functio
   -- we need g^m+a^r = g^z
   -- This is the case iff m + ar ≡ z (mod q)
   -- This is the case iff t ≡ a^−1 * (z − m) (mod q)
-  let a_unit := Units.mk0 (a.val : ZMod q) ha
+  let a_unit := Units.mk0 (a.val : ZMod q) a.2
   let r : ZMod q := (a_unit⁻¹ : ZMod q) * (z - m)
   have h_mod : (m + a_unit * r) = z := by
     subst r
@@ -85,77 +55,88 @@ lemma exp_bij' (a : ZMod q) (ha : (a.val : ZMod q) ≠ 0) (m : ZMod q) : Functio
     rw [h_mod]
 
   rw [←ZMod.cast_eq_val] at h_pow -- Transfer ↑ and .val back to .cast
-  sorry
-  --exact Exists.intro (r) h_pow
+  exact Exists.intro (r) h_pow
 
 
-noncomputable def expEquiv (a : ZMod q) (ha : (a.val : ZMod q) ≠ 0) (m : ZMod q) : ZMod q ≃ G :=
-Equiv.ofBijective (fun (r : ZMod q) => g^((m + (a.val) * r : ZMod q).val : ℤ)) (exp_bij' q G_card_q g g_gen_G a ha m)
+noncomputable def expEquiv (a : ZModMult q) (m : ZMod q) : ZMod q ≃ G :=
+Equiv.ofBijective (fun (r : ZMod q) => g^((m + (val a) * r : ZMod q).val : ℤ)) (exp_bij' q G_card_q g g_gen_G a m)
 
 variable (a' : ZMod q) (ha' : (a'.val : ZMod q) ≠ 0) (m' : ZMod q)
-#check (expEquiv q G_card_q g g_gen_G a' ha' m').invFun
+variable (az : ZModMult q) (mz : ZMod q)
+#check (expEquiv q G_card_q g g_gen_G az mz).invFun
+
 
 lemma pedersen_uniform_for_fixed_a
    {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
    (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c }) / (Finset.card ( (⊤ : Finset G) ) : ℚ)
    = 1 / (Fintype.card G) := by
-    have h_bij := exp_bij q G_card_q g g_gen_G ⟨a, ha⟩ m
+    let a_mult : ZModMult q := ⟨a, ha⟩
+    let equiv := @expEquiv G _ _ q _ G_card_q g g_gen_G a_mult m
     have h_card : Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } = 1 := by
       rw [Finset.card_eq_one]
-      obtain ⟨r, hr⟩ := h_bij.surjective c
-      use r
+      use equiv.symm c
       ext t
       simp only [Finset.mem_singleton, Finset.mem_filter, Finset.mem_univ, true_and]
+      have h_equiv_def : ∀ r, equiv r = g^((m + (val a_mult) * r : ZMod q).val : ℤ) := fun r => rfl
+      have h_val_eq : val a_mult = a := rfl
       constructor
       · intro ht
-        have : g ^ ((m + a * t : ZMod q).val : ℤ) = g ^ ((m + a * r : ZMod q).val : ℤ) := by
-          rw [ht, ← hr]
-          simp only [val]
-        exact h_bij.injective this
+        have : equiv t = c := by rw [h_equiv_def, h_val_eq, ht]
+        rw [← this, Equiv.eq_symm_apply]
       · intro ht
-        rw [ht, ← hr]
-        simp only [val]
+        subst ht
+        have : equiv (equiv.symm c) = c := Equiv.apply_symm_apply equiv c
+        rw [h_equiv_def, h_val_eq] at this
+        exact this
     rw [h_card]
     exact rfl
-
-
 
 lemma pedersen_uniform_for_fixed_a'
   {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
   Finset.card { r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val } = 1 := by
-    have h_ratio := pedersen_uniform_for_fixed_a q G_card_q g g_gen_G ha m c
-    have h_card : Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } = 1 := by
-      have h_pos : (0 : ℚ) < Finset.card (⊤ : Finset G) := by simp; exact Fintype.card_pos
-      have h_eq : (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } : ℚ) =
-             (Finset.card (⊤ : Finset G) : ℚ) / (Fintype.card G : ℚ) := by
-        grind --only [= Finset.card_univ, usr Finset.card_filter_le, cases Or]
-      have h_top : Finset.card (⊤ : Finset G) = Fintype.card G := by rfl
-      have : (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } : ℚ) = (1 : ℚ) := by
-        grind
-      exact Nat.cast_injective (R := ℚ) this
-    convert h_card using 2
+    let a_mult : ZModMult q := ⟨a, ha⟩
+    let equiv := @expEquiv G _ _ q _ G_card_q g g_gen_G a_mult m
+    have h_equiv_def : ∀ r, equiv r = g^((m + (val a_mult) * r : ZMod q).val : ℤ) := fun r => rfl
+    have h_val_eq : val a_mult = a := rfl
+    -- Show the goal using equiv
+    suffices Finset.card { r : ZMod q | g ^ ((m + a * r : ZMod q).val : ℤ) = c } = 1 by
+      convert this using 2
+      ext t
+      simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+      have key : g ^ ((m + a * t).val : ℤ) = g ^ m.val * (g ^ a.val) ^ t.val := by
+        have : (g ^ m.val * (g ^ a.val) ^ t.val : G) = g ^ m.val * g ^ (a.val * t.val) := by
+          rw [← pow_mul]
+        rw [this, ← pow_add]
+        have h_order : orderOf g = q := ordg_eq_q q G_card_q g g_gen_G
+        have h_val_eq_local : (m + a * t).val = (m.val + a.val * t.val) % q := by
+          have h_eq : (m + a * t : ZMod q) = ((m.val + a.val * t.val) : ℕ) := by
+            simp only [Nat.cast_add, ZMod.natCast_val, ZMod.cast_id', id_eq, Nat.cast_mul]
+          rw [h_eq, ZMod.val_natCast]
+        rw [h_val_eq_local]
+        show g ^ (((m.val + a.val * t.val) % q : ℕ) : ℤ) = g ^ (m.val + a.val * t.val : ℕ)
+        rw [← zpow_natCast]
+        have : (g : G) ^ (((m.val + a.val * t.val) % q : ℕ) : ℤ) = g ^ ((m.val + a.val * t.val : ℕ) : ℤ) := by
+          have : ((m.val + a.val * t.val : ℕ) : ℤ) % (orderOf g : ℤ) = ((m.val + a.val * t.val) % q : ℕ) := by
+            grind
+          rw [← this, zpow_mod_orderOf]
+        assumption
+      constructor
+      · intro h; rw [key, h]
+      · intro h; rw [← key, h]
+    -- Now prove the suffices goal
+    rw [Finset.card_eq_one]
+    use equiv.symm c
     ext t
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and]
-    have key : g ^ ((m + a * t).val : ℤ) = g ^ m.val * (g ^ a.val) ^ t.val := by
-      have : (g ^ m.val * (g ^ a.val) ^ t.val : G) = g ^ m.val * g ^ (a.val * t.val) := by
-        rw [← pow_mul]
-      rw [this]
-      rw [← pow_add]
-      have h_order : orderOf g = q := by
-        · expose_names; exact ordg_eq_q q G_card_q g g_gen_G
-      have h_val_eq : (m + a * t).val = (m.val + a.val * t.val) % q := by
-        have h_eq : (m + a * t : ZMod q) = ((m.val + a.val * t.val) : ℕ) := by
-          simp only [Nat.cast_add, ZMod.natCast_val, ZMod.cast_id', id_eq, Nat.cast_mul]
-        rw [h_eq, ZMod.val_natCast]
-      rw [h_val_eq]
-      show g ^ (((m.val + a.val * t.val) % q : ℕ) : ℤ) = g ^ (m.val + a.val * t.val : ℕ)
-      rw [← zpow_natCast]
-      have : (g : G) ^ (((m.val + a.val * t.val) % q : ℕ) : ℤ) = g ^ ((m.val + a.val * t.val : ℕ) : ℤ) := by
-        have : ((m.val + a.val * t.val : ℕ) : ℤ) % (orderOf g : ℤ) = ((m.val + a.val * t.val) % q : ℕ) := by
-          grind
-        rw [← this, zpow_mod_orderOf]
-      assumption
-    rw [key, eq_comm]
+    simp only [Finset.mem_singleton, Finset.mem_filter, Finset.mem_univ, true_and]
+    constructor
+    · intro ht
+      have : equiv t = c := by rw [h_equiv_def, h_val_eq, ht]
+      rw [← this, Equiv.eq_symm_apply]
+    · intro ht
+      subst ht
+      have : equiv (equiv.symm c) = c := Equiv.apply_symm_apply equiv c
+      rw [h_equiv_def, h_val_eq] at this
+      exact this
 
 
 -- Temporary?
