@@ -7,7 +7,7 @@ namespace Pedersen
     (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
       (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) :
       CommitmentScheme (ZMod q) G (ZMod q) G := {
-    setup := --setup q hq g,
+    setup := -- PMF.bind (PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2) (fun a => return g^a.val), --setup q hq g,
     do
       let a ← PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2
       return g^a.val,
