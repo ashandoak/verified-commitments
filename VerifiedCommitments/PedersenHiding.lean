@@ -341,6 +341,11 @@ lemma pedersen_commitment_uniform (m : ZMod q) [DecidableEq G] (c : G) :
     return g^m.val * (g^a.val)^r.val : PMF G) c = 1 / Fintype.card G := by
       sorry
 
+lemma bind_eq_map
+    {α β : Type*} [Fintype α] [Fintype β] [DecidableEq β] [Nonempty α] [Nonempty β]
+    (e : α ≃ β) :
+    PMF.map e (PMF.uniformOfFintype α) = PMF.bind (PMF.uniformOfFintype α) (fun a => pure (e a)) := by
+    rfl
 
 theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
   (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q),
