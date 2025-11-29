@@ -138,7 +138,7 @@ lemma pedersen_uniform_for_fixed_a
    (Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c }) / (Finset.card ( (⊤ : Finset G) ) : ℚ)
    = 1 / (Fintype.card G) := by
     let a_mult : ZModMult q := ⟨a, ha⟩
-    let equiv := @expEquiv G _ _ q _ G_card_q g g_gen_G a_mult m
+    let equiv := @expEquiv G _ _ q _ G_card_q g g_gen_G _ _ a_mult m
     have h_card : Finset.card { t : ZMod q | g ^ ((m + a * t : ZMod q).val : ℤ) = c } = 1 := by
       rw [Finset.card_eq_one]
       use equiv.symm c
@@ -162,7 +162,7 @@ lemma pedersen_uniform_for_fixed_a'
   {a : ZMod q} (ha : a ≠ 0) (m : ZMod q) [DecidableEq G] (c : G) :
   Finset.card { r : ZMod q | c = g ^ m.val * (g ^ a.val) ^ r.val } = 1 := by
     let a_mult : ZModMult q := ⟨a, ha⟩
-    let equiv := @expEquiv G _ _ q _ G_card_q g g_gen_G a_mult m
+    let equiv := @expEquiv G _ _ q _ G_card_q g g_gen_G _ _ a_mult m
     have h_equiv_def : ∀ r, equiv r = g^((m + (val a_mult) * r : ZMod q).val : ℤ) := fun r => rfl
     have h_val_eq : val a_mult = a := rfl
     -- Show the goal using equiv
@@ -213,7 +213,7 @@ lemma pedersen_uniform_for_fixed_a_probablistic
     unfold Pedersen.scheme
     rw [G_card_q]
     simp only [bind_pure_comp, one_div]
-    have h_bij := exp_bij q G_card_q g g_gen_G ⟨a, ha⟩ m
+    have h_bij := exp_bij' q G_card_q g g_gen_G ⟨a, ha⟩ m
     obtain ⟨r, hr⟩ := h_bij.surjective c'
     --subst hr
     --simp only [ne_eq, ZMod.natCast_val]
