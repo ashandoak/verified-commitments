@@ -464,7 +464,14 @@ lemma bind_eq_map
     PMF.map e (PMF.uniformOfFintype α) = PMF.bind (PMF.uniformOfFintype α) (fun a => pure (e a)) := by
     rfl
 
+lemma bind_eq_map' : ∀ (fixed_a : ZModMult q) (fixed_m : ZMod q),
+  PMF.map (expEquiv q G_card_q g g_gen_G fixed_a fixed_m) (PMF.uniformOfFintype (ZMod q)) =
+  PMF.bind (PMF.uniformOfFintype (ZMod q)) (fun a => pure (expEquiv q G_card_q g g_gen_G fixed_a fixed_m a))
+  := by
+  intros
+  exact rfl
 
+ -- let a_mult : ZModMult q := ⟨a, ha⟩
 lemma pedersen_commitment_uniform'' (m : ZMod q) [DecidableEq G] (c : G) :
   (PMF.bind (generate_a q hq_prime)
     (fun a => PMF.bind (PMF.uniformOfFintype (ZMod q))
