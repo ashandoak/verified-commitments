@@ -63,7 +63,58 @@ Equiv.ofBijective (fun (r : ZMod q) => g^((m + (val a) * r : ZMod q).val : ℤ))
 
 variable (a' : ZMod q) (ha' : (a'.val : ZMod q) ≠ 0) (m' : ZMod q)
 variable (az : ZModMult q) (mz : ZMod q)
-#check (expEquiv q G_card_q g g_gen_G az mz).invFun
+#check (expEquiv q G_card_q g g_gen_G az mz).toFun
+
+
+open Classical -- needed here or α must be DecidableEq
+/-! ### 2.  Mapping a uniform PMF through a bijection stays uniform -------------/
+-- Courtesy of formalmethods.io
+lemma map_uniformOfFintype_equiv
+    {α β : Type*} [Fintype α] [Fintype β] [DecidableEq β] [Nonempty α] [Nonempty β]
+    (e : α ≃ β) :
+    PMF.map e (PMF.uniformOfFintype α) = PMF.uniformOfFintype β := by
+  -- Prove equality of PMFs by showing they assign the same probability to each element
+  ext b
+  -- Goal: (PMF.map e (uniformOfFintype α)) b = (uniformOfFintype β) b
+
+  -- Step 1: Simplify the LHS using PMF.map_apply
+  rw [PMF.map_apply]
+  -- This gives us: ∑' (a : α), if b = e a then (uniformOfFintype α) a else 0
+
+  -- Step 2: Simplify the uniform distribution on α
+  simp only [PMF.uniformOfFintype_apply]
+  -- Goal: ∑' (a : α), if b = e a then (↑(card α))⁻¹ else 0 = (↑(card β))⁻¹
+
+  -- Step 3: The sum has exactly one non-zero term when a = e.symm b
+  -- We can rewrite this as a sum over the singleton {e.symm b}
+  have h_equiv : (∑' (a : α), if b = e a then (↑(Fintype.card α : ENNReal))⁻¹ else 0) =
+                 (∑' (a : α), if a = e.symm b then (↑(Fintype.card α))⁻¹ else 0) := by
+    congr 1
+    ext a
+    -- Show: (if b = e a then (↑(card α))⁻¹ else 0) = (if a = e.symm b then (↑(card α))⁻¹ else 0)
+    by_cases h : b = e a
+    · -- Case: b = e a
+      rw [if_pos h, if_pos]
+      -- Need to show a = e.symm b
+      rw [←Equiv.symm_apply_apply e a]
+      rw [h]
+    · -- Case: b ≠ e a
+      rw [if_neg h, if_neg]
+      -- Need to show a ≠ e.symm b
+      intro contra
+      subst contra
+      rw [Equiv.apply_symm_apply e] at h
+      apply h
+      rfl
+
+  -- Step 4: Apply the equivalence and simplify
+  rw [h_equiv]
+  rw [tsum_ite_eq]
+  -- Goal: (↑(card α))⁻¹ = (↑(card β))⁻¹
+
+  -- Step 5: Use the fact that equivalent finite types have the same cardinality
+  congr 1
+  rw [Fintype.card_congr e]
 
 
 lemma pedersen_uniform_for_fixed_a
