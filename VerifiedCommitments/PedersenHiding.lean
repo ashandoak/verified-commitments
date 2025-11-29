@@ -347,6 +347,15 @@ lemma bind_eq_map
     PMF.map e (PMF.uniformOfFintype α) = PMF.bind (PMF.uniformOfFintype α) (fun a => pure (e a)) := by
     rfl
 
+
+lemma pedersen_commitment_uniform'' (m : ZMod q) [DecidableEq G] (c : G) :
+  (PMF.bind (generate_a q hq_prime)
+    (fun a => PMF.bind (PMF.uniformOfFintype (ZMod q))
+      (fun r => PMF.pure (g^m.val * (g^a.val)^r.val)))) c = 1 / Fintype.card G := by
+      conv_lhs => arg 1; arg 2; ext a; rw [←@bind_eq_map _ _ (fun r ↦ PMF.pure (g ^ m.val * (g ^ a.val) ^ r.val))]
+
+      sorry
+
 theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
   (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q),
   perfect_hiding (Pedersen.scheme G g q hq_prime) := by
