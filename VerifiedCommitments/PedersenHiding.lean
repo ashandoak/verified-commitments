@@ -82,6 +82,7 @@ Equiv.ofBijective (fun (r : ZMod q) => g^((m + (val a) * r : ZMod q).val : ℤ))
 
 lemma expEquiv_unfold (a : ZModMult q) (m r : ZMod q) :
   expEquiv q G_card_q g g_gen_G a m r = g^m.val * (g^(val a).val)^r.val := by
+  sorry
 
 
 
@@ -156,7 +157,7 @@ noncomputable def generate_a : PMF (ZMod q) :=
 
 
 
-lemma pedersen_uniform_for_fixed_a_probablistic (a : ZModMult q) (m : ZMod q) :
+lemma pedersen_uniform_for_fixed_a_probablistic' (a : ZModMult q) (m : ZMod q) :
   PMF.map commit.c ((Pedersen.scheme G g q hq_prime).commit (g^(val a).val) m) =
   PMF.uniformOfFintype G := by
   -- Unfold commit definition
@@ -172,8 +173,7 @@ lemma pedersen_uniform_for_fixed_a_probablistic (a : ZModMult q) (m : ZMod q) :
 -- g^((m + (val a) * r : ZMod q).val : ℤ)
 lemma pedersen_uniform_for_fixed_a_probablistic
   (a : ZModMult q) (m : ZMod q) [DecidableEq G] (c' : G) :
-  PMF.map commit.c ((Pedersen.scheme G g q hq_prime).commit (g^(val a).val) m) c' = 1 / (Fintype.card G) := by -- Should be using ZModUtils?
-      sorry
+  PMF.map commit.c ((Pedersen.scheme G g q hq_prime).commit (g^(val a).val) m) c' = 1 / (Fintype.card G) := by sorry
 
 
 
