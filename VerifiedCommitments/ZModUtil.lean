@@ -18,3 +18,9 @@ def ZModMult (q : ℕ) [NeZero q] := {a : ZMod q // a ≠ 0}
 
 -- Helper function to extract the value from ZModMult
 def val {q : ℕ} [NeZero q] (a : ZModMult q) : ZMod q := a.val
+
+-- Fintype instance for ZModMult
+instance {q : ℕ} [NeZero q] : Fintype (ZModMult q) :=
+  Fintype.subtype ((Finset.univ : Finset (ZMod q)).erase 0) (by simp [Finset.mem_erase])
+
+instance {q : ℕ} [NeZero q] : Nonempty (ZModMult q) := sorry
