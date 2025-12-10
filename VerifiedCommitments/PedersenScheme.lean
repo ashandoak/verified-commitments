@@ -18,4 +18,14 @@ namespace Pedersen
     verify := fun h m c o => if c = g^m.val * h^o.val then 1 else 0  --verify h m c o g
   }
 
+  noncomputable def setup (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
+      (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) : PMF G :=
+      PMF.bind (PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2) (fun a => return g^a.val)
+
+  noncomputable def commit (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
+      (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) (h : G) (m : ZMod q) : PMF G :=
+      do
+        let r ← PMF.uniformOfFintype (ZMod q)
+        return g^m.val * h^r.val
+
 end Pedersen

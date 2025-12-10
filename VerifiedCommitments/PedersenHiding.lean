@@ -175,17 +175,48 @@ variable [IsCyclic G] [DecidableEq G] (hq_prime : Nat.Prime q)
 noncomputable def generate_a : PMF (ZModMult q) :=
   PMF.uniformOfFintype (ZModMult q)
 
+lemma bij_uniform_for_fixed_a (a : ZModMult q) (m : ZMod q) :
+  PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q)) = (PMF.uniformOfFintype G) := by
+  · expose_names;
+    exact map_uniformOfFintype_equiv q G_card_q g g_gen_G (expEquiv q G_card_q g g_gen_G a m)
+
+lemma bij_uniform_for_uniform_a (m : ZMod q) :
+  (PMF.bind (generate_a q)
+    (fun a => PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q)))) = (PMF.uniformOfFintype G) := by
+  unfold generate_a
+  apply bind_skip_const'
+  intro a
+  · expose_names; exact bij_uniform_for_fixed_a q G_card_q g g_gen_G a m
 
 
 lemma pedersen_uniform_for_fixed_a_probablistic' (a : ZModMult q) (m : ZMod q) :
-  PMF.map commit.c ((Pedersen.scheme G g q hq_prime).commit (g^(val a).val) m) =
+  (Pedersen.commit G g q hq_prime (g^(val a).val) m) =
   PMF.uniformOfFintype G := by
-  -- Unfold commit definition
-  -- Use expEquiv_unfold to rewrite as map through expEquiv
-  -- Apply bind_eq_map'
-  -- Apply map_uniformOfFintype_equiv
-  -- Use G_card_q to get the right cardinality
-  sorry
+  rw [← bij_uniform_for_fixed_a q G_card_q g g_gen_G a m]
+  -- Unfold Pedersen.commit
+  unfold Pedersen.commit
+  simp only [bind_pure_comp]
+  -- Now both sides are PMF.map over uniformOfFintype (ZMod q)
+  congr 1
+  funext r
+  exact (expEquiv_unfold q G_card_q g g_gen_G a m r).symm
+
+
+lemma bij_fixed_a_equiv_pedersen_commit (m : ZMod q) (a : ZModMult q) :
+  PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q)) =
+  (Pedersen.commit G g q hq_prime (g^(val a).val) m) := by
+  rw [bij_uniform_for_fixed_a q G_card_q g g_gen_G a m]
+  rw [← pedersen_uniform_for_fixed_a_probablistic' q G_card_q g g_gen_G hq_prime a m]
+
+
+lemma bij_random_a_equiv_pedersen_commit (m : ZMod q) :
+  PMF.bind (generate_a q)
+    (fun a => PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q))) =
+  PMF.bind (generate_a q)
+    (fun a => (Pedersen.commit G g q hq_prime (g^(val a).val) m)) := by
+  congr 1
+  funext a
+  exact bij_fixed_a_equiv_pedersen_commit q G_card_q g g_gen_G hq_prime m a
 
 
 -- for fixed aa ∈ {1, ... , q − 1}, and for any m ∈ Zq, if t ← Zq, then  g^m*h^r is uniformly distributed over G
