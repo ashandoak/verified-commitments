@@ -152,8 +152,9 @@ lemma bind_eq_map' : ∀ (fixed_a : ZModMult q) (fixed_m : ZMod q),
 
 -- Temporary?
 variable [IsCyclic G] [DecidableEq G] (hq_prime : Nat.Prime q)
-noncomputable def generate_a : PMF (ZMod q) :=
-  PMF.uniformOfFintype (ZMod q)
+
+noncomputable def generate_a : PMF (ZModMult q) :=
+  PMF.uniformOfFintype (ZModMult q)
 
 
 
