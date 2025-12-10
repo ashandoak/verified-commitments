@@ -82,8 +82,27 @@ Equiv.ofBijective (fun (r : ZMod q) => g^((m + (val a) * r : ZMod q).val : ℤ))
 
 lemma expEquiv_unfold (a : ZModMult q) (m r : ZMod q) :
   expEquiv q G_card_q g g_gen_G a m r = g^m.val * (g^(val a).val)^r.val := by
-  sorry
+  unfold expEquiv
+  simp only [Equiv.ofBijective, Equiv.coe_fn_mk]
 
+  have h_pow : (g^(val a).val)^r.val = g^((val a).val * r.val) := (pow_mul g (val a).val r.val).symm
+  rw [h_pow]
+
+  simp only [← zpow_natCast]
+  rw [← zpow_add]
+
+  have hord : orderOf g = q := ordg_eq_q q G_card_q g g_gen_G
+  conv_lhs => rw [← zpow_mod_orderOf, hord]
+
+  suffices h : (((m + (val a) * r).val : ℤ) % ↑q) = ((m.val : ℤ) + ((val a).val * r.val : ℤ)) % ↑q by
+    conv_rhs => rw [← zpow_mod_orderOf, hord]
+    rw [h]
+    congr 1
+
+  conv_lhs => rw [ZMod.val_add, ZMod.val_mul]
+  norm_cast
+  rw [Nat.add_mod, Nat.mul_mod]
+  simp
 
 
 open Classical -- needed here or α must be DecidableEq
