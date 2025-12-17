@@ -66,7 +66,7 @@ lemma exp_bij' (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod 
 
 
 -- Fintype instance for commit
-instance {C O : Type} [Fintype C] [Fintype O] : Fintype (commit C O) :=
+instance {C O : Type} [Fintype C] [Fintype O] : Fintype (Commit C O) :=
   Fintype.ofEquiv (C × O) {
     toFun := fun ⟨c, o⟩ => ⟨c, o⟩
     invFun := fun ⟨c, o⟩ => ⟨c, o⟩
@@ -191,7 +191,7 @@ lemma bij_uniform_for_uniform_a (m : ZMod q) :
 
 lemma pedersen_uniform_for_fixed_a_probablistic' (a : ZModMult q) (m : ZMod q) :
   (Pedersen.commit G g q hq_prime (g^(val a).val) m) =
-  PMF.uniformOfFintype G := by
+  PMF.uniformOfFintype (Commit G (ZMod q)) := by
   rw [← bij_uniform_for_fixed_a q G_card_q g g_gen_G a m]
   -- Unfold Pedersen.commit
   unfold Pedersen.commit
@@ -224,7 +224,7 @@ lemma bij_random_a_equiv_pedersen_commit (m : ZMod q) :
 -- g^((m + (val a) * r : ZMod q).val : ℤ)
 lemma pedersen_uniform_for_fixed_a_probablistic
   (a : ZModMult q) (m : ZMod q) [DecidableEq G] (c' : G) :
-  PMF.map commit.c ((Pedersen.scheme G g q hq_prime).commit (g^(val a).val) m) c' = 1 / (Fintype.card G) := by sorry
+  PMF.map Commit.c ((Pedersen.scheme G g q hq_prime).commit (g^(val a).val) m) c' = 1 / (Fintype.card G) := by sorry
 
 
 

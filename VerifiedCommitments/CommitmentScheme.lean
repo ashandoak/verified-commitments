@@ -4,13 +4,13 @@ import Mathlib.Probability.ProbabilityMassFunction.Constructions
 import Mathlib.Data.ZMod.Defs
 
 
-structure commit (C O : Type) where
+structure Commit (C O : Type) where
   c : C
   o : O
 
 structure CommitmentScheme (M C O K : Type) where
   setup : PMF K
-  commit : K → M → PMF (commit C O)
+  commit : K → M → PMF (Commit C O)
   verify : K → M → C → O → ZMod 2
 
 namespace Adversary
