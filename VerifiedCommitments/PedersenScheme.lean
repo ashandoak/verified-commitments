@@ -43,3 +43,5 @@ namespace Pedersen
     }
 
 end Pedersen
+
+instance {G : Type} {q : ℕ} [NeZero q] : Nonempty (Commit G (ZMod q)) := sorry
