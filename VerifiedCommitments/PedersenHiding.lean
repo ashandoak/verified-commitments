@@ -190,7 +190,7 @@ lemma bij_uniform_for_uniform_a (m : ZMod q) :
 
 
 lemma pedersen_uniform_for_fixed_a_probablistic' (a : ZModMult q) (m : ZMod q) :
-  (Pedersen.commit G g q hq_prime (g^(val a).val) m) =
+  (Pedersen.commit G g q (g^(val a).val) m) =
   PMF.uniformOfFintype (Commit G (ZMod q)) := by
   rw [← bij_uniform_for_fixed_a q G_card_q g g_gen_G a m]
   -- Unfold Pedersen.commit
@@ -204,7 +204,7 @@ lemma pedersen_uniform_for_fixed_a_probablistic' (a : ZModMult q) (m : ZMod q) :
 
 lemma bij_fixed_a_equiv_pedersen_commit (m : ZMod q) (a : ZModMult q) :
   PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q)) =
-  (Pedersen.commit G g q hq_prime (g^(val a).val) m) := by
+  (Pedersen.commit G g q (g^(val a).val) m) := by
   rw [bij_uniform_for_fixed_a q G_card_q g g_gen_G a m]
   rw [← pedersen_uniform_for_fixed_a_probablistic' q G_card_q g g_gen_G hq_prime a m]
 
@@ -213,7 +213,7 @@ lemma bij_random_a_equiv_pedersen_commit (m : ZMod q) :
   PMF.bind (generate_a q)
     (fun a => PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q))) =
   PMF.bind (generate_a q)
-    (fun a => (Pedersen.commit G g q hq_prime (g^(val a).val) m)) := by
+    (fun a => (Pedersen.commit G g q g^(val a).val) m)) := by
   congr 1
   funext a
   exact bij_fixed_a_equiv_pedersen_commit q G_card_q g g_gen_G hq_prime m a
