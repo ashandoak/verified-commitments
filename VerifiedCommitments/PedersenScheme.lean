@@ -32,4 +32,14 @@ namespace Pedersen
     (q : ℕ) [NeZero q] (h : G) (m : ZMod q) (c : G) (o : ZMod q): ZMod 2 :=
     if c = g^m.val * h^o.val then 1 else 0
 
+
+  noncomputable def scheme
+    (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
+    (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) :
+    CommitmentScheme (ZMod q) G (ZMod q) G := {
+      setup := setup G g q hq_prime,
+      commit (h : G) (m : ZMod q) := commit G g q h m,
+      verify (h : G) (m : ZMod q) (c : G) (o : ZMod q):= verify G g q h m c o
+    }
+
 end Pedersen
