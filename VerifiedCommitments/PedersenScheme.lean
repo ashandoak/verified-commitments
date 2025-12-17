@@ -23,10 +23,10 @@ namespace Pedersen
     PMF.bind (PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2) (fun a => return g^a.val)
 
   noncomputable def commit (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] (h : G) (m : ZMod q) : PMF G :=
+    (q : ℕ) [NeZero q] (h : G) (m : ZMod q) : PMF (Commit G (ZMod q)) :=
     do
       let r ← PMF.uniformOfFintype (ZMod q)
-      return g^m.val * h^r.val
+      return ⟨g^m.val * h^r.val, r⟩
 
   noncomputable def verify (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
     (q : ℕ) [NeZero q] (h : G) (m : ZMod q) (c : G) (o : ZMod q): ZMod 2 :=
