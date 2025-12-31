@@ -4,13 +4,14 @@ import Mathlib.Probability.ProbabilityMassFunction.Constructions
 import Mathlib.Data.ZMod.Defs
 
 
-structure Commit (C O : Type) where
-  c : C
-  o : O
+-- namespace Crypto - or similar?
+-- structure Commit (C O : Type) where
+--   c : C
+--   o : O
 
 structure CommitmentScheme (M C O K : Type) where
   setup : PMF K
-  commit : K → M → PMF (Commit C O)
+  commit : K → M → PMF (C × O)
   verify : K → M → C → O → ZMod 2
 
 namespace Adversary
@@ -22,13 +23,18 @@ structure guess (M C O : Type) where
   o': O
 end Adversary
 
-variable {M C O K : Type}
+
+namespace Commitment
 
 noncomputable section
+variable {M C O K : Type}
+variable (scheme : CommitmentScheme M C O K)
+
+variable (h : K)
 
 def correctness (scheme : CommitmentScheme M C O K) : Prop :=
   ∀ (h : K) (m : M),
-  PMF.bind (scheme.commit h m) (fun commit => pure $ scheme.verify h m commit.c commit.o) = pure 1
+  PMF.bind (scheme.commit h m) (fun (commit, opening_val) => pure $ scheme.verify h m commit opening_val) = pure 1
 
 -- Perfect binding
 def perfect_binding (scheme : CommitmentScheme M C O K) : Prop :=
@@ -72,7 +78,7 @@ def do_commit (scheme: CommitmentScheme M C O K) (m : M) : PMF C :=
 do
   let h ← scheme.setup
   let commit ← scheme.commit h m
-  return commit.c
+  return commit.1
 
 def perfect_hiding (scheme: CommitmentScheme M C O K) : Prop :=
   ∀ (m m' : M) (c : C), (do_commit scheme m) c = (do_commit scheme m') c
@@ -84,9 +90,13 @@ def comp_hiding_game (scheme : CommitmentScheme M C O K)
   do
     let h ← scheme.setup -- As above with comp_binding_game
     let commit ← scheme.commit h m
-    A h commit.c
+    A h commit.1
 
 def computational_hiding (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
   ∀ (A : K → C → PMF (ZMod 2)) (m₀ m₁ : M),
   comp_hiding_game scheme A m₀ 1 - comp_hiding_game scheme A m₁ 1 ≤ ε ||
   comp_hiding_game scheme A m₁ 1 - comp_hiding_game scheme A m₀ 1 ≤ ε
+
+end
+
+end Commitment

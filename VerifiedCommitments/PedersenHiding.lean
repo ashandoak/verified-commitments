@@ -1,10 +1,8 @@
 import VerifiedCommitments.PedersenScheme
 import VerifiedCommitments.ZModUtil
-import Mathlib -- Would like to trim down this import but the Units.mk0 (a.val : ZMod q) a.2 line is a problem
 
 -- Temporary
 import VerifiedCommitments.«scratch-skip-bind»
-
 
 variable {G: Type} [Fintype G] [Group G]
 variable (q : ℕ) [Fact (Nat.Prime q)]
@@ -66,7 +64,7 @@ lemma exp_bij' (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod 
 
 
 -- Fintype instance for commit
-instance {C O : Type} [Fintype C] [Fintype O] : Fintype (Commit C O) :=
+instance {C O : Type} [Fintype C] [Fintype O] : Fintype (C × O) :=
   Fintype.ofEquiv (C × O) {
     toFun := fun ⟨c, o⟩ => ⟨c, o⟩
     invFun := fun ⟨c, o⟩ => ⟨c, o⟩
@@ -170,7 +168,7 @@ lemma bind_eq_map' : ∀ (fixed_a : ZModMult q) (fixed_m : ZMod q),
 
 
 -- Temporary?
-variable [IsCyclic G] [DecidableEq G] (hq_prime : Nat.Prime q)
+-- variable [IsCyclic G] [DecidableEq G] (hq_prime : Nat.Prime q)
 
 noncomputable def generate_a : PMF (ZModMult q) :=
   PMF.uniformOfFintype (ZModMult q)

@@ -5,12 +5,12 @@ namespace Pedersen
 
 lemma binding_as_hard_dlog
   (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] (hq_prime : Nat.Prime q) (ε : ENNReal)
+    (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] (hq_prime : Nat.Prime q)
     (G_card_q : Fintype.card G = q)
     (hg_gen : orderOf g = Fintype.card G)
     (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))) :
-    comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ DLog.experiment G g q hq_prime (DLog.adversary' G q A) 1 := by
-  simp only [DLog.experiment, comp_binding_game', Pedersen.scheme, DLog.adversary']
+    Commitment.comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ DLog.experiment G g q hq_prime (DLog.adversary' G q A) 1 := by
+  simp only [DLog.experiment, Commitment.comp_binding_game', Pedersen.scheme, DLog.adversary']
   simp only [bind_pure_comp, ite_eq_left_iff, zero_ne_one, imp_false, Decidable.not_not, ne_eq,
     bind_map_left, ite_not, map_bind]
   congr! 5 with x ⟨c, m, m', o, o'⟩
@@ -94,7 +94,7 @@ theorem Pedersen.computational_binding :
     (hg_gen : orderOf g = Fintype.card G),
     (∀ (A : G → PMF (ZMod q)), DLog.experiment G g q hq_prime A 1 ≤ ε) →
     (∀ (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))),
-    comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
+    Commitment.comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
   intro G _ _ _ _ g q _ _ hq_prime ε G_card_q hg_gen hdlog A
   exact le_trans (binding_as_hard_dlog G g q hq_prime ε G_card_q hg_gen A) (hdlog (DLog.adversary' G q A))
 
