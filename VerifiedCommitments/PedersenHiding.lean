@@ -168,9 +168,6 @@ lemma bind_eq_map' : ∀ (fixed_a : ZModMult q) (fixed_m : ZMod q),
   intros
   exact rfl
 
-noncomputable def generate_a : PMF (ZModMult q) :=
-  PMF.uniformOfFintype (ZModMult q)
-
 -- 1
 lemma bij_uniform_for_fixed_a (a : ZModMult q) (m : ZMod q) :
   PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q)) = (PMF.uniformOfFintype G) := by

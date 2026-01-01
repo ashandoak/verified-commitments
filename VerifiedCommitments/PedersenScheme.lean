@@ -1,13 +1,22 @@
 import VerifiedCommitments.CommitmentScheme
 import VerifiedCommitments.dlog
+import VerifiedCommitments.ZModUtil
 
 namespace Pedersen
+
+-- TODO: I'm not sure this should be here, or that
+-- Setup should definitely return h, but should there be another def hanging around that computes an a independently?
+
+noncomputable def generate_a (q : ℕ) [NeZero q] : PMF (ZModMult q) :=
+  PMF.uniformOfFintype (ZModMult q)
+
 
 noncomputable section
 
   def setup (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
     (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q) : PMF G :=
-    PMF.bind (PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2) (fun a => return g^a.val)
+    PMF.bind (PMF.uniformOfFintype (ZModMult q)) (fun a => return g^(val a).val)
+    --PMF.bind (PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2) (fun a => return g^a.val)
 
   def commit (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
     (q : ℕ) [NeZero q] (h : G) (m : ZMod q) : PMF (G × (ZMod q)) :=
