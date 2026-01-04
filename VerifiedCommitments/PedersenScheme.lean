@@ -21,9 +21,7 @@ noncomputable section
 
   def commit (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
     (q : ℕ) [NeZero q] (h : G) (m : ZMod q) : PMF (G × (ZMod q)) :=
-    do
-      let r ← PMF.uniformOfFintype (ZMod q)
-      return ⟨g^m.val * h^r.val, r⟩
+    PMF.bind (PMF.uniformOfFintype (ZMod q)) (fun r => return ⟨g^m.val * h^r.val, r⟩)
 
   def verify (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
     (q : ℕ) [NeZero q] (h : G) (m : ZMod q) (c : G) (o : ZMod q): ZMod 2 :=
