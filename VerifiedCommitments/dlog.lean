@@ -4,6 +4,7 @@ import Mathlib.Probability.Distributions.Uniform
 import Mathlib.Data.ZMod.Basic
 import VerifiedCommitments.ProofUtils
 import VerifiedCommitments.CommitmentScheme
+import VerifiedCommitments.ZModUtil
 
 namespace DLog
 
@@ -20,10 +21,10 @@ def advantage (G : Type) [Group G] (q : ℕ) [NeZero q] (g : G) (A : G → PMF (
 
 noncomputable def experiment
   (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q)
+    (q : ℕ) [NeZero q]
     (A' : G → PMF (ZMod q)) : PMF (ZMod 2) :=
-  PMF.bind (PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2) (fun x =>
-    PMF.bind (A' (g^x.val)) (fun x' => pure (if g^x'.val = g^x.val then 1 else 0)))
+  PMF.bind (PMF.uniformOfFintype (ZModMult q)) (fun x =>
+    PMF.bind (A' (g^(val x).val)) (fun x' => pure (if g^x'.val = g^(val x).val then 1 else 0)))
 
   noncomputable def adversary
     (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G]
