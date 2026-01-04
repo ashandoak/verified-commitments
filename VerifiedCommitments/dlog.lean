@@ -21,7 +21,7 @@ def advantage (G : Type) [Group G] (q : ℕ) [NeZero q] (g : G) (A : G → PMF (
 
 noncomputable def experiment
   (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q]
+    (q : ℕ) [NeZero q] [Fact (Nat.Prime q)]
     (A' : G → PMF (ZMod q)) : PMF (ZMod 2) :=
   PMF.bind (PMF.uniformOfFintype (ZModMult q)) (fun x =>
     PMF.bind (A' (g^(val x).val)) (fun x' => pure (if g^x'.val = g^(val x).val then 1 else 0)))
