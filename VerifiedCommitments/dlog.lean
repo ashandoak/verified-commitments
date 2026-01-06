@@ -13,12 +13,15 @@ PMF.bind (PMF.uniformOfFintype (ZMod q)) (fun x =>
 -- attack_game returns a PMF ()
 def advantage (G : Type) [Group G] (q : ℕ) [NeZero q] (g : G) (A : G → PMF (ZMod q)) : ENNReal := attack_game G q g A 1
 
+#check Pedersen.scheme
 noncomputable def experiment
   (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [Fact (Nat.Prime q)]
+    (q : ℕ) [NeZero q] [Fact (Nat.Prime q)] (hq_prime : Nat.Prime q)
     (A' : G → PMF (ZMod q)) : PMF (ZMod 2) :=
-  PMF.bind (PMF.uniformOfFintype (ZModMult q)) (fun x =>
-    PMF.bind (A' (g^(val x).val)) (fun x' => pure (if g^x'.val = g^(val x).val then 1 else 0)))
+  PMF.bind (Pedersen.scheme G g q hq_prime).setup (fun h =>
+    PMF.bind (A' h.1) (fun x' => pure (if g^x'.val = g^(h.2).val then 1 else 0)))
+  -- PMF.bind (PMF.uniformOfFintype (ZModMult q)) (fun x =>
+  --   PMF.bind (A' (g^(val x).val)) (fun x' => pure (if g^x'.val = g^(val x).val then 1 else 0)))
 
   noncomputable def adversary
     (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G]

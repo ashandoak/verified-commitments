@@ -10,7 +10,7 @@ import Mathlib.Data.ZMod.Defs
 --   o : O
 
 structure CommitmentScheme (M C O K : Type) where
-  setup : PMF K
+  setup : PMF (K × O)
   commit : K → M → PMF (C × O)
   verify : K → M → C → O → ZMod 2
 
@@ -52,8 +52,8 @@ def comp_binding_game (scheme : CommitmentScheme M C O K)
   (A : K → PMF (C × M × M × O × O)) : PMF $ ZMod 2 :=
   open scoped Classical in
   PMF.bind scheme.setup (fun h =>
-    PMF.bind (A h) (fun (c, m , m', o, o') =>
-     if scheme.verify h m c o = 1 ∧ scheme.verify h m' c o' = 1 ∧ m ≠ m' then pure 1 else pure 0 ))
+    PMF.bind (A h.1) (fun (c, m , m', o, o') =>
+     if scheme.verify h.1 m c o = 1 ∧ scheme.verify h.1 m' c o' = 1 ∧ m ≠ m' then pure 1 else pure 0 ))
 
 def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
   ∀ (A : K → PMF (C × M × M × O × O)), comp_binding_game scheme A 1 ≤ ε
@@ -63,8 +63,8 @@ def comp_binding_game' (scheme : CommitmentScheme M C O K)
   (A' : K → PMF (Adversary.guess M C O)) : PMF $ ZMod 2 :=
   open scoped Classical in
   PMF.bind scheme.setup (fun h =>
-    PMF.bind (A' h) (fun guess =>
-      if scheme.verify h guess.m guess.c guess.o = 1 ∧ scheme.verify h guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m' then pure 1 else pure 0 ))
+    PMF.bind (A' h.1) (fun guess =>
+      if scheme.verify h.1 guess.m guess.c guess.o = 1 ∧ scheme.verify h.1 guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m' then pure 1 else pure 0 ))
 
 def computational_binding' [DecidableEq M] (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
   ∀ (A' : K → PMF (Adversary.guess M C O )), comp_binding_game' scheme A' 1 ≤ ε
@@ -73,7 +73,7 @@ def computational_binding' [DecidableEq M] (scheme : CommitmentScheme M C O K) (
 -- Perfect hiding
 def do_commit (scheme: CommitmentScheme M C O K) (m : M) : PMF C :=
 PMF.bind scheme.setup (fun h =>
-  PMF.bind (scheme.commit h m) (fun commit => pure commit.1))
+  PMF.bind (scheme.commit h.1 m) (fun commit => pure commit.1))
 
 def perfect_hiding (scheme: CommitmentScheme M C O K) : Prop :=
   ∀ (m m' : M) (c : C), (do_commit scheme m) c = (do_commit scheme m') c
@@ -82,7 +82,7 @@ def perfect_hiding (scheme: CommitmentScheme M C O K) : Prop :=
 def comp_hiding_game (scheme : CommitmentScheme M C O K)
   (A : K → C → PMF (ZMod 2)) (m : M) : PMF (ZMod 2) :=
   PMF.bind scheme.setup (fun h =>
-    PMF.bind (scheme.commit h m) (fun commit => A h commit.1))
+    PMF.bind (scheme.commit h.1 m) (fun commit => A h.1 commit.1))
 
 def computational_hiding (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
   ∀ (A : K → C → PMF (ZMod 2)) (m₀ m₁ : M),

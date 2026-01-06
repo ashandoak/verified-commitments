@@ -15,8 +15,8 @@ noncomputable def generate_a (q : ℕ) [NeZero q] [Fact (Nat.Prime q)] : PMF (ZM
 noncomputable section
 
   def setup (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [Fact (Nat.Prime q)] (hq_prime : Nat.Prime q) : PMF G :=
-    PMF.bind (PMF.uniformOfFintype (ZModMult q)) (fun a => return g^(val a).val)
+    (q : ℕ) [NeZero q] [Fact (Nat.Prime q)] (hq_prime : Nat.Prime q) : PMF (G × (ZMod q)) :=
+    PMF.bind (PMF.uniformOfFintype (ZModMult q)) (fun a => return ⟨g^(val a).val, val a⟩)
     -- PMF.bind (PMF.uniformOfFinset (nonzeroElements hq_prime).1 (nonzeroElements hq_prime).2) (fun a => return g^a.val)
 
   def commit (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)

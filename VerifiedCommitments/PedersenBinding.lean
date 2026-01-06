@@ -1,4 +1,5 @@
 import VerifiedCommitments.PedersenScheme
+import VerifiedCommitments.dlog
 import Mathlib.Tactic
 
 namespace Pedersen
@@ -52,18 +53,18 @@ lemma binding_implies_dlog
 
   -- this is o_ne
     -- have h_noo' : o' ≠ o := by exact fun a ↦ ho (id (Eq.symm a))
-    have h_coprime : (guess.o - guess.o').val.Coprime q := by
-      cases' Nat.coprime_or_dvd_of_prime hq_prime (o' - o).val with h_cop h_dvd
+    have h_coprime : (guess.o' - guess.o).val.Coprime q := by
+      cases' Nat.coprime_or_dvd_of_prime hq_prime (guess.o' - guess.o).val with h_cop h_dvd
       · exact Nat.coprime_comm.mp h_cop
       · exfalso
-        have h_zero : guess.o - guess.o' = 0 := by
+        have h_zero : guess.o' - guess.o = 0 := by
           rw [← ZMod.val_eq_zero]
-          have h_mod_zero : (guess.o - guess.o').val % q = 0 := Nat.mod_eq_zero_of_dvd h_dvd
-          have h_val_bound : (guess.o - guess.o').val < q := ZMod.val_lt (guess.o - guess.o')
+          have h_mod_zero : (guess.o' - guess.o).val % q = 0 := Nat.mod_eq_zero_of_dvd h_dvd
+          have h_val_bound : (guess.o' - guess.o).val < q := ZMod.val_lt (guess.o' - guess.o)
           exact Nat.eq_zero_of_dvd_of_lt h_dvd h_val_bound
-        exact o_ne (eq_of_sub_eq_zero h_zero)
+        exact o_ne.symm (eq_of_sub_eq_zero h_zero)
 
-    have h_ex_inv : ∃ y, ↑(guess.o - guess.o').val * y ≡ 1 [ZMOD q] := by apply Int.mod_coprime h_coprime
+    have h_ex_inv : ∃ y, ↑(guess.o' - guess.o).val * y ≡ 1 [ZMOD q] := by apply Int.mod_coprime h_coprime
 
     have h_ord : orderOf g = q := by
       rw [← G_card_q]; exact hg_gen
@@ -119,9 +120,9 @@ lemma binding_as_hard_dlog
     (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] (hq_prime : Nat.Prime q)
     (G_card_q : Fintype.card G = q)
     (hg_gen : orderOf g = Fintype.card G)
-    (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))) :
+    (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))) : -- Pedersen adversary
     haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩;
-    Commitment.comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ DLog.experiment G g q (DLog.adversary' G q A) 1 := by
+    Commitment.comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ DLog.experiment G g q hq_prime (DLog.adversary' G q A) 1 := by
   haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩
   -- Unfold definitions
   unfold Commitment.comp_binding_game' DLog.experiment DLog.adversary'
@@ -147,15 +148,12 @@ lemma binding_as_hard_dlog
 
 theorem computational_binding :
   ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] [Fact (Nat.Prime q)] (ε : ENNReal)
+    (q : ℕ) [NeZero q] [CancelMonoidWithZero (ZMod q)] [Fact (Nat.Prime q)] (hq_prime : (Nat.Prime q)) (ε : ENNReal)
     (G_card_q : Fintype.card G = q)
     (hg_gen : orderOf g = Fintype.card G),
-    (∀ (A : G → PMF (ZMod q)), DLog.experiment G g q A 1 ≤ ε) →
+    (∀ (A : G → PMF (ZMod q)), DLog.experiment G g q hq_prime A 1 ≤ ε) →
     (∀ (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))),
     ∃ hq_prime : Nat.Prime q, Commitment.comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
-  intro G _ _ _ _ g q _ _ _ ε G_card_q hg_gen hdlog A
-  have hq_prime := Fact.out (p := Nat.Prime q)
-  use hq_prime
+  intro G _ _ _ _ g q _ _ _ hq_prime ε G_card_q hg_gen hdlog A
   exact le_trans (binding_as_hard_dlog G g q hq_prime G_card_q hg_gen A) (hdlog (DLog.adversary' G q A))
-
 end Pedersen
