@@ -1,10 +1,4 @@
-import Mathlib.Probability.ProbabilityMassFunction.Basic
-import Mathlib.Probability.ProbabilityMassFunction.Monad
-import Mathlib.Probability.Distributions.Uniform
-import Mathlib.Data.ZMod.Basic
-import VerifiedCommitments.ProofUtils
-import VerifiedCommitments.CommitmentScheme
-import VerifiedCommitments.ZModUtil
+import VerifiedCommitments.PedersenScheme
 
 namespace DLog
 

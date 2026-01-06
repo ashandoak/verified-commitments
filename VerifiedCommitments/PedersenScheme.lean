@@ -1,5 +1,5 @@
 import VerifiedCommitments.CommitmentScheme
-import VerifiedCommitments.dlog
+import Mathlib.Probability.Distributions.Uniform
 import VerifiedCommitments.ZModUtil
 
 namespace Pedersen
