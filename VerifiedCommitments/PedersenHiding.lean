@@ -185,40 +185,42 @@ lemma bij_uniform_for_uniform_a (m : ZMod q) :
   · expose_names; exact bij_uniform_for_fixed_a q G_card_q g g_gen_G a m
 
 -- 3
--- 1, 2 -> 3
+-- Direct proof without using bij_uniform_for_uniform_a
 lemma bij_random_a_equiv_pedersen_commit (m : ZMod q) :
   PMF.bind (generate_a q)
     (fun a => PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q))) =
   PMF.map Prod.fst (PMF.bind (generate_a q)
     (fun a => (Pedersen.commit G g q (g^(val a).val) m))) := by
-    simp only [bij_uniform_for_uniform_a q G_card_q g g_gen_G m]
     unfold Pedersen.commit generate_a
     simp only [PMF.map_bind]
-    rw [bind_skip_const']
+    -- Goal: bind uniform_a (λ a. map expEquiv uniform_r) = bind uniform_a (λ a. bind uniform_r (λ r. map Prod.fst (pure (g^..., r))))
+    apply bind_skip'
     intro a
-    have h_bind_eq : PMF.bind (PMF.uniformOfFintype (ZMod q))
-                       (fun r => PMF.map Prod.fst (pure (g^m.val * (g^(val a).val)^r.val, r))) =
-                     PMF.bind (PMF.uniformOfFintype (ZMod q))
-                       (fun r => PMF.pure (g^m.val * (g^(val a).val)^r.val)) := by
-      apply bind_skip'
-      intro r
-      simp only [pure, PMF.pure_map]
-    rw [h_bind_eq]
-    conv_lhs =>
-      arg 2
-      ext r
-      arg 1
-      rw [← expEquiv_unfold q G_card_q g g_gen_G a m r]
-    rw [← bind_eq_map']
-    exact bij_uniform_for_fixed_a q G_card_q g g_gen_G a m
+    -- Goal: map expEquiv uniform_r = bind uniform_r (λ r. map Prod.fst (pure (g^..., r)))
+    ext c
+    simp only [PMF.map_apply, PMF.bind_apply, pure, PMF.pure_apply, PMF.pure_map]
+    -- Both sides are sums, show they're equal
+    congr 1
+    ext r
+    by_cases h : c = (expEquiv q G_card_q g g_gen_G a m) r
+    · simp only [h, ↓reduceIte]
+      rw [expEquiv_unfold q G_card_q g g_gen_G a m r]
+      simp
+    · simp only [h, ↓reduceIte]
+      have : ¬(c = g ^ m.val * (g ^ (val a).val) ^ r.val) := by
+        intro contra
+        rw [← expEquiv_unfold q G_card_q g g_gen_G a m r] at contra
+        exact h contra
+      simp [this]
 
 
 -- 4
--- 3, 2 -> 6
+-- 2, 3 -> 4
 lemma pedersen_commitment_uniform (m : ZMod q) (c : G) :
   (PMF.map Prod.fst ((PMF.bind (generate_a q)
     (fun a => Pedersen.commit G g q (g^(val a).val) m ))) c) =
     ((1 : ENNReal) / (Fintype.card G)) := by
+    -- Rewrite using bij_random_a_equiv_pedersen_commit, then apply bij_uniform_for_uniform_a
     rw [← bij_random_a_equiv_pedersen_commit q G_card_q g g_gen_G m]
     rw [bij_uniform_for_uniform_a q G_card_q g g_gen_G m]
     simp [PMF.uniformOfFintype_apply]
@@ -245,4 +247,5 @@ theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic
 
     -- rw [Pedersen.pedersen_commitment_uniform q G_card_q g g_gen_G m c] -- goal structure changed
     -- The proof would continue to show both sides are uniform, hence equal
+
     sorry
