@@ -1,6 +1,7 @@
 import VerifiedCommitments.PedersenScheme
 import VerifiedCommitments.dlog
 import Mathlib.Tactic
+import VerifiedCommitments.«scratch-skip-bind»
 
 namespace Pedersen
 
@@ -21,38 +22,15 @@ lemma binding_implies_dlog
   simp only [verify] at h1 h2
   split at h1 <;> split at h2
   case' isTrue.isTrue c_eq1 c_eq2 =>
-    -- We have: g^m.val * h^o.val = g^m'.val * h^o'.val
-    -- Substituting h = g^a.val:
-    -- g^m.val * g^(a.val * o.val) = g^m'.val * g^(a.val * o'.val)
-    -- g^(m.val + a.val * o.val) = g^(m'.val + a.val * o'.val)
-
     simp only [h] at c_eq1 c_eq2
-    -- c_eq1: guess.c = g ^ guess.m.val * (g ^ a.val) ^ guess.o.val
-    -- c_eq2: guess.c = g ^ guess.m'.val * (g ^ a.val) ^ guess.o'.val
 
     have collision : g^guess.m.val * (g^a.val)^guess.o.val = g^guess.m'.val * (g^a.val)^guess.o'.val := by
       rw [← c_eq1, c_eq2]
 
-    -- Simplify (g^a.val)^o.val to g^(a.val * o.val)
     conv_lhs at collision => arg 2; rw [← pow_mul]
     conv_rhs at collision => arg 2; rw [← pow_mul]
-    -- Combine: g^m.val * g^(a.val * o.val) = g^(m + a*o).val
     rw [← pow_add, ← pow_add] at collision
 
-    -- From collision: g^(m.val + a.val*o.val) = g^(m'.val + a.val*o'.val)
-    -- We need to extract a from this equation
-    -- Strategy: show that a = (m - m') / (o' - o)
-
-    -- First, rearrange the equation algebraically in ZMod q:
-    -- m + a*o = m' + a*o' (as elements of ZMod q when viewed mod q)
-    -- m - m' = a*o' - a*o
-    -- m - m' = a*(o' - o)
-    -- Therefore: a = (m - m') / (o' - o) = (m - m') * (o' - o)⁻¹
-
-    -- Now we need to show g^(((m - m') * (o' - o)⁻¹).val) = g^a.val
-
-  -- this is o_ne
-    -- have h_noo' : o' ≠ o := by exact fun a ↦ ho (id (Eq.symm a))
     have h_coprime : (guess.o' - guess.o).val.Coprime q := by
       cases' Nat.coprime_or_dvd_of_prime hq_prime (guess.o' - guess.o).val with h_cop h_dvd
       · exact Nat.coprime_comm.mp h_cop
@@ -64,15 +42,8 @@ lemma binding_implies_dlog
           exact Nat.eq_zero_of_dvd_of_lt h_dvd h_val_bound
         exact o_ne.symm (eq_of_sub_eq_zero h_zero)
 
-    have h_ex_inv : ∃ y, ↑(guess.o' - guess.o).val * y ≡ 1 [ZMOD q] := by apply Int.mod_coprime h_coprime
-
     have h_ord : orderOf g = q := by
       rw [← G_card_q]; exact hg_gen
-
-  -- this is collision
-    -- have h_pow : g ^ (m.val + x.val * o.val) = g ^ (m'.val + x.val * o'.val) := by
-    --   simp [←pow_mul, ←pow_add] at h2
-    --   exact h2
 
     have h_congr_nat : guess.m.val + a.val * guess.o.val ≡ guess.m'.val + a.val * guess.o'.val [MOD q] := by
       simpa [h_ord] using (pow_eq_pow_iff_modEq.mp collision)
@@ -128,22 +99,152 @@ lemma binding_as_hard_dlog
   unfold Commitment.comp_binding_game' DLog.experiment DLog.adversary'
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
 
-  -- Both games now sample from PMF.uniformOfFintype (ZModMult q)
-  -- LHS: Pr[a ← ZModMult q; guess ← A(g^a); binding succeeds]
-  -- RHS: Pr[a ← ZModMult q; guess ← A(g^a); adversary' extracts a correctly]
+  -- Expand the bind applications
+  rw [PMF.bind_apply, PMF.bind_apply]
 
-  -- The LHS sums over G, but only elements of the form g^a for a ∈ ZModMult q have nonzero weight
-  -- The RHS sums over ZModMult q directly
+  -- Both sum over the same type: G × ZMod q (the pairs from setup)
+  -- We need pointwise inequality
+  apply ENNReal.tsum_le_tsum
+  intro ⟨h, a⟩
 
-  -- Strategy: Show that for each a ∈ ZModMult q and each guess from A(g^a):
-  --   if binding succeeds with o ≠ o', then adversary' extracts a correctly
-  --   if binding succeeds with o = o', we get a contradiction (m = m')
-  -- Therefore: Pr[binding succeeds] ≤ Pr[adversary' extracts a]
+  -- Key observation: setup only returns pairs (g^x.val, x)
+  -- So if h ≠ g^a.val, the probability of this pair is 0 and inequality holds trivially
+  by_cases h_case : h = g^a.val
 
-  -- The key challenge is that we need to massage the LHS to sum over ZModMult q
-  -- instead of G, using the fact that only g^a values have nonzero probability.
+  · -- Case: h = g^a.val (pair is in support of setup)
+    subst h_case  -- Replace h with g^a.val everywhere
 
-  sorry
+    -- Now we have h = g^a.val as needed!
+    apply mul_le_mul_right
+
+    -- Now compare the inner probabilities
+    -- Continue with the proof that was already working
+    -- First, use bind associativity on RHS to flatten the nested binds
+    conv_rhs => rw [PMF.bind_bind]
+
+    -- Now both have structure: (A (g^a.val)).bind (fun guess => ...) 1
+    -- Expand the bind application
+    rw [PMF.bind_apply, PMF.bind_apply]
+
+    -- Now both are sums over Adversary.guess
+    apply ENNReal.tsum_le_tsum
+    intro guess
+
+    apply mul_le_mul_right
+
+    -- For each guess, show:
+    -- (if [binding succeeds] then pure 1 else pure 0) 1 ≤
+    -- ((if o≠o' then pure x' else uniform).bind (λ x'. pure (if g^x'=g^a then 1 else 0))) 1
+
+    simp only [ite_eq_left_iff, zero_ne_one, imp_false, Decidable.not_not, ne_eq, ite_not,
+      PMF.bind_apply, tsum_fintype]
+    rw [@DFunLike.ite_apply]
+    split_ifs with h₁ h₂
+
+    · -- Case 1: h₁ (binding) AND h₂ (o = o')
+      -- This is the contradiction case: o = o' but binding succeeds
+      exfalso
+      obtain ⟨eq1, eq2, m_ne⟩ := h₁
+      -- Since h₂: o = o', we have (g^a.val)^o.val = (g^a.val)^o'.val
+      have ho_eq : (g^a.val)^guess.o.val = (g^a.val)^guess.o'.val := by
+        rw [h₂]
+      -- So: g^m.val * (g^a.val)^o.val = g^m'.val * (g^a.val)^o.val
+      have collision : g^guess.m.val * (g^a.val)^guess.o.val = g^guess.m'.val * (g^a.val)^guess.o.val := by
+        calc g^guess.m.val * (g^a.val)^guess.o.val
+            = guess.c := eq1.symm
+          _ = g^guess.m'.val * (g^a.val)^guess.o'.val := eq2
+          _ = g^guess.m'.val * (g^a.val)^guess.o.val := by rw [← ho_eq]
+      -- Cancel (g^a.val)^o.val from both sides
+      have g_eq : g^guess.m.val = g^guess.m'.val := mul_right_cancel collision
+      -- Since g is a generator, this means m.val ≡ m'.val (mod q)
+      have h_ord : orderOf g = q := by rw [← G_card_q]; exact hg_gen
+      have h_congr : guess.m.val ≡ guess.m'.val [MOD q] := by
+        simpa [h_ord] using (pow_eq_pow_iff_modEq.mp g_eq)
+      -- Therefore m = m' in ZMod q
+      have m_eq : guess.m = guess.m' := by
+        have eq_cast : ((guess.m.val : ℕ) : ZMod q) = ((guess.m'.val : ℕ) : ZMod q) :=
+          ZMod.natCast_eq_natCast_iff guess.m.val guess.m'.val q |>.mpr h_congr
+        simp at eq_cast
+        exact eq_cast
+      exact m_ne m_eq
+
+    · -- Case 2: Binding succeeds (h₁) AND o ≠ o' (¬h₂)
+      -- This is the main case where we use binding_implies_dlog
+      have h_o_ne : guess.o ≠ guess.o' := h₂
+      let x' := (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
+
+      -- Convert h₁ to the form expected by binding_implies_dlog
+      have h₁' : (let h := g^a.val;
+                  let verify := fun m c o => if c = g^m.val * h^o.val then (1 : ZMod 2) else 0;
+                  verify guess.m guess.c guess.o = 1 ∧ verify guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m') := by
+        obtain ⟨eq1, eq2, m_ne⟩ := h₁
+        simp only []
+        refine ⟨?_, ?_, m_ne⟩
+        · split
+          · rfl
+          · contradiction
+        · split
+          · rfl
+          · contradiction
+
+      -- By binding_implies_dlog, g^x'.val = g^a.val
+      have h_dlog : g^x'.val = g^a.val := by
+        apply binding_implies_dlog G g q hq_prime G_card_q hg_gen a guess h₁' h_o_ne
+
+      -- The RHS is a sum over a single-element distribution (pure x')
+      -- The sum includes the term for x = x', which equals 1
+      have h_term : (PMF.pure x') x' * (PMF.pure (if g^x'.val = g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) = 1 := by
+        rw [PMF.pure_apply, PMF.pure_apply]
+        simp only [h_dlog]
+        norm_num
+      have h_zero : ∀ x ∈ Finset.univ, x ∉ ({x'} : Finset (ZMod q)) →
+                    (PMF.pure x') x * (PMF.pure (if g^x.val = g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) = 0 := by
+        intros x _ hx
+        rw [PMF.pure_apply]
+        simp only [Finset.mem_singleton] at hx
+        simp [hx]
+      have h_sum_ge : (PMF.pure x') x' * (PMF.pure (if g^x'.val = g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) ≤
+                      ∑ x, (PMF.pure x') x * (PMF.pure (if g^x.val = g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) := by
+        rw [← Finset.sum_subset (Finset.subset_univ {x'}) h_zero]
+        simp only [Finset.sum_singleton]
+        rfl
+      calc (PMF.pure (1 : ZMod 2)) (1 : ZMod 2)
+          = 1 := by rw [PMF.pure_apply]; norm_num
+        _ = (PMF.pure x') x' * (PMF.pure (if g^x'.val = g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) := h_term.symm
+        _ ≤ ∑ x, (PMF.pure x') x * (PMF.pure (if g^x.val = g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) := h_sum_ge
+
+    · -- Case 3: Binding fails (¬h₁) AND o = o' (h✝)
+      show (PMF.pure (0 : ZMod 2)) (1 : ZMod 2) ≤ _
+      rw [PMF.pure_apply]
+      norm_num
+
+    · -- Case 4: Binding fails (¬h₁) AND o ≠ o' (¬h✝)
+      show (PMF.pure (0 : ZMod 2)) (1 : ZMod 2) ≤ _
+      rw [PMF.pure_apply]
+      norm_num
+
+  · -- Case neg: h ≠ g^a.val (pair is NOT in support)
+    -- Setup only returns pairs of the form (g^x.val, x)
+    -- So if h ≠ g^a.val, then (h, a) has probability 0 in the setup distribution
+    -- Therefore both sides are 0 * something = 0, and 0 ≤ 0
+    have h_prob_zero : ((PMF.uniformOfFintype (ZModMult q)).bind fun a_mult => PMF.pure (g^(val a_mult).val, val a_mult)) (h, a) = 0 := by
+      rw [PMF.bind_apply, tsum_fintype]
+      apply Finset.sum_eq_zero
+      intros a_mult _
+      rw [PMF.pure_apply, PMF.uniformOfFintype_apply]
+      split_ifs with h_eq
+      · -- If (h, a) = (g^(val a_mult).val, val a_mult)
+        -- Then h = g^(val a_mult).val and a = val a_mult
+        exfalso
+        have eq_h : h = g^(val a_mult).val := (Prod.mk.injEq _ _ _ _).mp h_eq |>.1
+        have eq_a : a = val a_mult := (Prod.mk.injEq _ _ _ _).mp h_eq |>.2
+        rw [← eq_a] at eq_h
+        exact h_case eq_h
+      · simp
+    change ((PMF.uniformOfFintype (ZModMult q)).bind fun a_mult => PMF.pure (g^(val a_mult).val, val a_mult)) (h, a) * _ ≤
+           ((PMF.uniformOfFintype (ZModMult q)).bind fun a_mult => PMF.pure (g^(val a_mult).val, val a_mult)) (h, a) * _
+    rw [h_prob_zero]
+    simp only [zero_mul, le_refl]
 
 
 theorem computational_binding :
@@ -155,5 +256,6 @@ theorem computational_binding :
     (∀ (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))),
     ∃ hq_prime : Nat.Prime q, Commitment.comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
   intro G _ _ _ _ g q _ _ _ hq_prime ε G_card_q hg_gen hdlog A
+  use hq_prime
   exact le_trans (binding_as_hard_dlog G g q hq_prime G_card_q hg_gen A) (hdlog (DLog.adversary' G q A))
 end Pedersen
