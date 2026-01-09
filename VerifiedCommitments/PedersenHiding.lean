@@ -218,7 +218,7 @@ theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic
   (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q)
   (G_card_q : Fintype.card G = q)
   (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g),
-  haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩; Commitment.perfect_hiding (Pedersen.scheme G g q hq_prime) := by
+  haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩; Commitment.perfect_hiding (Pedersen.scheme G g q) := by
     intros G _ _ _ _ g q _ hq_prime G_card_q g_gen_G
     haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩
     unfold Commitment.perfect_hiding

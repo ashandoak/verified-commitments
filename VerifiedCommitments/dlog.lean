@@ -16,12 +16,10 @@ def advantage (G : Type) [Group G] (q : ℕ) [NeZero q] (g : G) (A : G → PMF (
 #check Pedersen.scheme
 noncomputable def experiment
   (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-    (q : ℕ) [NeZero q] [Fact (Nat.Prime q)] (hq_prime : Nat.Prime q)
+    (q : ℕ) [NeZero q] [Fact (Nat.Prime q)]
     (A' : G → PMF (ZMod q)) : PMF (ZMod 2) :=
-  PMF.bind (Pedersen.scheme G g q hq_prime).setup (fun h =>
+  PMF.bind (Pedersen.scheme G g q).setup (fun h =>
     PMF.bind (A' h.1) (fun x' => pure (if g^x'.val = g^(h.2).val then 1 else 0)))
-  -- PMF.bind (PMF.uniformOfFintype (ZModMult q)) (fun x =>
-  --   PMF.bind (A' (g^(val x).val)) (fun x' => pure (if g^x'.val = g^(val x).val then 1 else 0)))
 
   noncomputable def adversary
     (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G]
