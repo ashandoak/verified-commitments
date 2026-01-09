@@ -1,3 +1,8 @@
+import VerifiedCommitments.CommitmentScheme
 import VerifiedCommitments.dlog
-import VerifiedCommitments.pedersen
-import VerifiedCommitments.«commitment-scheme»
+import VerifiedCommitments.PedersenBinding
+import VerifiedCommitments.PedersenHiding
+import VerifiedCommitments.PedersenScheme
+import VerifiedCommitments.ProofUtils
+import VerifiedCommitments.«scratch-skip-bind»
+import VerifiedCommitments.ZModUtil
