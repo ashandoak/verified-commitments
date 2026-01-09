@@ -3,12 +3,6 @@ import Mathlib.Probability.ProbabilityMassFunction.Monad
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
 import Mathlib.Data.ZMod.Defs
 
-
--- namespace Crypto - or similar?
--- structure Commit (C O : Type) where
---   c : C
---   o : O
-
 structure CommitmentScheme (M C O K : Type) where
   setup : PMF (K × O)
   commit : K → M → PMF (C × O)
@@ -22,7 +16,6 @@ structure guess (M C O : Type) where
   o : O
   o': O
 end Adversary
-
 
 namespace Commitment
 
@@ -49,25 +42,14 @@ def perfect_binding (scheme : CommitmentScheme M C O K) : Prop :=
 -- Security depends on generating the parameters correctly, but at this level probably alright to have the group and generator fixed
 -- h should be inside the game, because its unique to a specific run
 def comp_binding_game (scheme : CommitmentScheme M C O K)
-  (A : K → PMF (C × M × M × O × O)) : PMF $ ZMod 2 :=
-  open scoped Classical in
-  PMF.bind scheme.setup (fun h =>
-    PMF.bind (A h.1) (fun (c, m , m', o, o') =>
-     if scheme.verify h.1 m c o = 1 ∧ scheme.verify h.1 m' c o' = 1 ∧ m ≠ m' then pure 1 else pure 0 ))
-
-def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
-  ∀ (A : K → PMF (C × M × M × O × O)), comp_binding_game scheme A 1 ≤ ε
-
--- With Adversary namespace
-def comp_binding_game' (scheme : CommitmentScheme M C O K)
   (A' : K → PMF (Adversary.guess M C O)) : PMF $ ZMod 2 :=
   open scoped Classical in
   PMF.bind scheme.setup (fun h =>
     PMF.bind (A' h.1) (fun guess =>
       if scheme.verify h.1 guess.m guess.c guess.o = 1 ∧ scheme.verify h.1 guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m' then pure 1 else pure 0 ))
 
-def computational_binding' [DecidableEq M] (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
-  ∀ (A' : K → PMF (Adversary.guess M C O )), comp_binding_game' scheme A' 1 ≤ ε
+def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
+  ∀ (A' : K → PMF (Adversary.guess M C O )), comp_binding_game scheme A' 1 ≤ ε
 
 
 -- Perfect hiding

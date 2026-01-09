@@ -93,10 +93,10 @@ lemma binding_as_hard_dlog
     (hg_gen : orderOf g = Fintype.card G)
     (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))) : -- Pedersen adversary
     haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩;
-    Commitment.comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ DLog.experiment G g q hq_prime (DLog.adversary' G q A) 1 := by
+    Commitment.comp_binding_game (Pedersen.scheme G g q hq_prime) A 1 ≤ DLog.experiment G g q hq_prime (DLog.adversary' G q A) 1 := by
   haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩
   -- Unfold definitions
-  unfold Commitment.comp_binding_game' DLog.experiment DLog.adversary'
+  unfold Commitment.comp_binding_game DLog.experiment DLog.adversary'
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
 
   -- Expand the bind applications
@@ -254,7 +254,7 @@ theorem computational_binding :
     (hg_gen : orderOf g = Fintype.card G),
     (∀ (A : G → PMF (ZMod q)), DLog.experiment G g q hq_prime A 1 ≤ ε) →
     (∀ (A : G → PMF (Adversary.guess (ZMod q) G (ZMod q))),
-    ∃ hq_prime : Nat.Prime q, Commitment.comp_binding_game' (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
+    ∃ hq_prime : Nat.Prime q, Commitment.comp_binding_game (Pedersen.scheme G g q hq_prime) A 1 ≤ ε) := by
   intro G _ _ _ _ g q _ _ _ hq_prime ε G_card_q hg_gen hdlog A
   use hq_prime
   exact le_trans (binding_as_hard_dlog G g q hq_prime G_card_q hg_gen A) (hdlog (DLog.adversary' G q A))
