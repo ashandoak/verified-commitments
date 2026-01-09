@@ -23,4 +23,4 @@ def val {q : ℕ} [NeZero q] (a : ZModMult q) : ZMod q := a.val
 instance {q : ℕ} [NeZero q] : Fintype (ZModMult q) :=
   Fintype.subtype ((Finset.univ : Finset (ZMod q)).erase 0) (by simp [Finset.mem_erase])
 
-instance {q : ℕ} [NeZero q] : Nonempty (ZModMult q) := sorry
+instance {q : ℕ} [NeZero q] [Fact (Nat.Prime q)] : Nonempty (ZModMult q) := ⟨⟨1, one_ne_zero⟩⟩

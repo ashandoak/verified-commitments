@@ -1,10 +1,10 @@
 import VerifiedCommitments.PedersenScheme
 import VerifiedCommitments.ZModUtil
-import Mathlib -- Would like to trim down this import but the Units.mk0 (a.val : ZMod q) a.2 line is a problem
 
 -- Temporary
 import VerifiedCommitments.«scratch-skip-bind»
 
+namespace Pedersen
 
 variable {G: Type} [Fintype G] [Group G]
 variable (q : ℕ) [Fact (Nat.Prime q)]
@@ -66,7 +66,7 @@ lemma exp_bij' (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod 
 
 
 -- Fintype instance for commit
-instance {C O : Type} [Fintype C] [Fintype O] : Fintype (commit C O) :=
+instance {C O : Type} [Fintype C] [Fintype O] : Fintype (C × O) :=
   Fintype.ofEquiv (C × O) {
     toFun := fun ⟨c, o⟩ => ⟨c, o⟩
     invFun := fun ⟨c, o⟩ => ⟨c, o⟩
@@ -168,13 +168,6 @@ lemma bind_eq_map' : ∀ (fixed_a : ZModMult q) (fixed_m : ZMod q),
   intros
   exact rfl
 
-
--- Temporary?
-variable [IsCyclic G] [DecidableEq G] (hq_prime : Nat.Prime q)
-
-noncomputable def generate_a : PMF (ZModMult q) :=
-  PMF.uniformOfFintype (ZModMult q)
-
 lemma bij_uniform_for_fixed_a (a : ZModMult q) (m : ZMod q) :
   PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q)) = (PMF.uniformOfFintype G) := by
   · expose_names;
@@ -188,69 +181,68 @@ lemma bij_uniform_for_uniform_a (m : ZMod q) :
   intro a
   · expose_names; exact bij_uniform_for_fixed_a q G_card_q g g_gen_G a m
 
-
-lemma pedersen_uniform_for_fixed_a_probablistic' (a : ZModMult q) (m : ZMod q) :
-  (Pedersen.commit G g q hq_prime (g^(val a).val) m) =
-  PMF.uniformOfFintype G := by
-  rw [← bij_uniform_for_fixed_a q G_card_q g g_gen_G a m]
-  -- Unfold Pedersen.commit
-  unfold Pedersen.commit
-  simp only [bind_pure_comp]
-  -- Now both sides are PMF.map over uniformOfFintype (ZMod q)
-  congr 1
-  funext r
-  exact (expEquiv_unfold q G_card_q g g_gen_G a m r).symm
-
-
-lemma bij_fixed_a_equiv_pedersen_commit (m : ZMod q) (a : ZModMult q) :
-  PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q)) =
-  (Pedersen.commit G g q hq_prime (g^(val a).val) m) := by
-  rw [bij_uniform_for_fixed_a q G_card_q g g_gen_G a m]
-  rw [← pedersen_uniform_for_fixed_a_probablistic' q G_card_q g g_gen_G hq_prime a m]
-
-
-lemma bij_random_a_equiv_pedersen_commit (m : ZMod q) :
-  PMF.bind (generate_a q)
-    (fun a => PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q))) =
-  PMF.bind (generate_a q)
-    (fun a => (Pedersen.commit G g q hq_prime (g^(val a).val) m)) := by
-  congr 1
-  funext a
-  exact bij_fixed_a_equiv_pedersen_commit q G_card_q g g_gen_G hq_prime m a
-
-
--- for fixed aa ∈ {1, ... , q − 1}, and for any m ∈ Zq, if t ← Zq, then  g^m*h^r is uniformly distributed over G
--- We can do this by proving t ↦ g^m*h^r is a bijection - see exp_bij above
--- g^((m + (val a) * r : ZMod q).val : ℤ)
-lemma pedersen_uniform_for_fixed_a_probablistic
-  (a : ZModMult q) (m : ZMod q) [DecidableEq G] (c' : G) :
-  PMF.map commit.c ((Pedersen.scheme G g q hq_prime).commit (g^(val a).val) m) c' = 1 / (Fintype.card G) := by sorry
+lemma pedersen_commitment_uniform (m : ZMod q) (c : G) :
+  (PMF.map Prod.fst ((PMF.bind (generate_a q)
+    (fun a => Pedersen.commit G g q (g^(val a).val) m ))) c) =
+    ((1 : ENNReal) / (Fintype.card G)) := by
+    unfold Pedersen.commit
+    simp only [PMF.map_bind, pure, PMF.pure_map]
+    have h_eq : (PMF.bind (generate_a q)
+                  (fun a => PMF.bind (PMF.uniformOfFintype (ZMod q))
+                    (fun r => PMF.pure (g^m.val * (g^(val a).val)^r.val)))) =
+                (PMF.bind (generate_a q)
+                  (fun a => PMF.map (expEquiv q G_card_q g g_gen_G a m) (PMF.uniformOfFintype (ZMod q)))) := by
+      apply bind_skip'
+      intro a
+      ext x
+      simp only [PMF.bind_apply, PMF.map_apply, PMF.pure_apply, PMF.uniformOfFintype_apply]
+      congr 1; ext r
+      by_cases h : x = g^m.val * (g^(val a).val)^r.val
+      · simp only [h, ↓reduceIte]
+        rw [← expEquiv_unfold q G_card_q g g_gen_G a m r]
+        simp
+      · simp only [h, ↓reduceIte]
+        have : x ≠ expEquiv q G_card_q g g_gen_G a m r := by
+          intro contra
+          rw [expEquiv_unfold q G_card_q g g_gen_G a m r] at contra
+          exact h contra
+        simp [this]
+    rw [h_eq]
+    rw [bij_uniform_for_uniform_a q G_card_q g g_gen_G m]
+    simp [PMF.uniformOfFintype_apply]
 
 
-
-
--- lemma pedersen_commitment_uniform'' (m : ZMod q) [DecidableEq G] (c : G) :
---   (PMF.bind (generate_a q)
---     (fun a => PMF.bind (PMF.uniformOfFintype (ZMod q))
---       (fun r => PMF.pure (g^m.val * (g^((val a).val))^r.val)))) c = 1 / Fintype.card G := by
---       --have h_expEquiv : PMF.uniformOfFintype (ZMod q)).bind fun r ↦ PMF.pure (g ^ m.val * (g ^ (val a).val) ^ r.val
---       unfold generate_a
---       simp [PMF.bind_apply]
---       rw [tsum_fintype]
---       simp_rw [tsum_fintype]
---       conv_lhs => arg 1; arg 2; rw [←bind_eq_map' q G_card_q g g_gen_G a m] --do I need to first get a version of expEquiv and unfold to match the def?
-
---       sorry
+end Pedersen
 
 theorem Pedersen.perfect_hiding : ∀ (G : Type) [Fintype G] [Group G] [IsCyclic G] [DecidableEq G] (g : G)
-  (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q),
-  perfect_hiding (Pedersen.scheme G g q hq_prime) := by
-    intros G _ _ _ _ g q _ hq_prime
-    simp only [Pedersen.scheme, _root_.perfect_hiding, do_commit]
-    simp only [bind_pure_comp, Functor.map_map, bind_map_left]
-    intro m m' c
-    rw [bind, Functor.map]
-    simp only [PMF]
-    rw [Monad.toBind, PMF.instMonad]
-
-    sorry
+  (q : ℕ) [NeZero q] (hq_prime : Nat.Prime q)
+  (G_card_q : Fintype.card G = q)
+  (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g),
+  haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩; Commitment.perfect_hiding (Pedersen.scheme G g q hq_prime) := by
+    intros G _ _ _ _ g q _ hq_prime G_card_q g_gen_G
+    haveI : Fact (Nat.Prime q) := ⟨hq_prime⟩
+    unfold Commitment.perfect_hiding
+    intros m m' c
+    unfold Commitment.do_commit Pedersen.scheme
+    simp only []
+    unfold Pedersen.setup Pedersen.commit
+    simp only [PMF.bind_bind]
+    have h_lhs : ((PMF.uniformOfFintype (ZModMult q)).bind fun a =>
+                   PMF.bind (pure (g^(val a).val, val a)) fun h =>
+                     (PMF.uniformOfFintype (ZMod q)).bind fun r =>
+                       PMF.bind (pure (g^m.val * h.1^r.val, r)) fun commit =>
+                         pure commit.1) c = 1 / Fintype.card G := by
+      simp only [pure, PMF.pure_bind]
+      convert pedersen_commitment_uniform q G_card_q g g_gen_G m c using 2
+      unfold generate_a Pedersen.commit
+      simp only [PMF.map_bind, pure, PMF.pure_map]
+    have h_rhs : ((PMF.uniformOfFintype (ZModMult q)).bind fun a =>
+                   PMF.bind (pure (g^(val a).val, val a)) fun h =>
+                     (PMF.uniformOfFintype (ZMod q)).bind fun r =>
+                       PMF.bind (pure (g^m'.val * h.1^r.val, r)) fun commit =>
+                         pure commit.1) c = 1 / Fintype.card G := by
+      simp only [pure, PMF.pure_bind]
+      convert pedersen_commitment_uniform q G_card_q g g_gen_G m' c using 2
+      unfold generate_a Pedersen.commit
+      simp only [PMF.map_bind, pure, PMF.pure_map]
+    rw [h_lhs, h_rhs]
