@@ -33,4 +33,4 @@ noncomputable section
 end
 end Pedersen
 
-instance {G : Type} {q : ℕ} [NeZero q] : Nonempty (G × (ZMod q)) := sorry
+instance {G : Type} {q : ℕ} [NeZero q] [Nonempty G] : Nonempty (G × (ZMod q)) := inferInstance
