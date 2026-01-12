@@ -39,25 +39,25 @@ lemma exp_bij' (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod 
   simp only
 
   let z : ZMod q := (k : ZMod q) -- Since g is a generator we have c = g^z for some z ∈ Zq
-  have hk' : g ^ (z.val : ℤ) = c := by
-    rw [←hk]
+  have hk : g ^ (z.val : ℤ) = c := by
     simp only [ZMod.natCast_val]
+    rw [←hk]
     rw [ZMod.coe_intCast]
     rw [← G_card_q]
     rw [@zpow_mod_card]
 
-  -- we need g^m+a^r = g^z
-  -- This is the case iff m + ar ≡ z (mod q)
-  -- This is the case iff t ≡ a^−1 * (z − m) (mod q)
-  let a_unit := Units.mk0 (a.val : ZMod q) a.2
-  let r : ZMod q := (a_unit⁻¹ : ZMod q) * (z - m)
-  have h_mod : (m + a_unit * r) = z := by
+  let a_inv : ZMod q := (val a)⁻¹
+  let r : ZMod q := a_inv * (z - m)
+  have h_mod : (m + val a * r) = z := by
     subst r
-    rw [IsUnit.mul_inv_cancel_left (Exists.intro a_unit rfl) (z - m)]
-    simp
+    subst a_inv
+    rw [IsUnit.mul_inv_cancel_left]
+    · simp only [add_sub_cancel]
+    · simp only [isUnit_iff_ne_zero, ne_eq]
+      exact ZModMult.coe_ne_zero a
 
-  have h_pow : g^((m + a_unit * r).val : ℤ) = c := by
-    rw [←hk']
+  have h_pow : g^((m + val a * r).val : ℤ) = c := by
+    rw [←hk]
     subst r
     rw [h_mod]
 
