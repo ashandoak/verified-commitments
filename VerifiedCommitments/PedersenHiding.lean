@@ -49,12 +49,10 @@ lemma exp_bij' (a : ZModMult q) (m : ZMod q) : Function.Bijective fun (r : ZMod 
   let a_inv : ZMod q := (val a)⁻¹
   let r : ZMod q := a_inv * (z - m)
   have h_mod : (m + val a * r) = z := by
-    subst r
-    subst a_inv
-    rw [IsUnit.mul_inv_cancel_left]
-    · simp only [add_sub_cancel]
-    · simp only [isUnit_iff_ne_zero, ne_eq]
-      exact ZModMult.coe_ne_zero a
+    subst r a_inv
+    rw [←mul_assoc, mul_inv_cancel₀, one_mul]
+    · exact add_sub_cancel m z
+    · exact ZModMult.coe_ne_zero a
 
   have h_pow : g^((m + val a * r).val : ℤ) = c := by
     rw [←hk]
