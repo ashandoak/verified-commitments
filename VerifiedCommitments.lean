@@ -6,3 +6,4 @@ import VerifiedCommitments.PedersenScheme
 import VerifiedCommitments.ProofUtils
 import VerifiedCommitments.«scratch-skip-bind»
 import VerifiedCommitments.ZModUtil
+import VerifiedCommitments.MapPMFBijection
