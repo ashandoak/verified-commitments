@@ -8,14 +8,12 @@ structure CommitmentScheme (M C O K : Type) where
   commit : K → M → PMF (C × O)
   verify : K → M → C → O → ZMod 2
 
-namespace Adversary
-structure guess (M C O : Type) where
+structure BindingGuess (M C O : Type) where
   c : C
   m : M
   m' : M
   o : O
   o': O
-end Adversary
 
 namespace Commitment
 
@@ -42,14 +40,14 @@ def perfect_binding (scheme : CommitmentScheme M C O K) : Prop :=
 -- Security depends on generating the parameters correctly, but at this level probably alright to have the group and generator fixed
 -- h should be inside the game, because its unique to a specific run
 def comp_binding_game (scheme : CommitmentScheme M C O K)
-  (A' : K → PMF (Adversary.guess M C O)) : PMF $ ZMod 2 :=
+  (A' : K → PMF (BindingGuess M C O)) : PMF $ ZMod 2 :=
   open scoped Classical in
   PMF.bind scheme.setup (fun h =>
     PMF.bind (A' h.1) (fun guess =>
       if scheme.verify h.1 guess.m guess.c guess.o = 1 ∧ scheme.verify h.1 guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m' then pure 1 else pure 0 ))
 
 def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
-  ∀ (A' : K → PMF (Adversary.guess M C O )), comp_binding_game scheme A' 1 ≤ ε
+  ∀ (A' : K → PMF (BindingGuess M C O )), comp_binding_game scheme A' 1 ≤ ε
 
 
 -- Perfect hiding

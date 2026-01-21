@@ -73,12 +73,12 @@ noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (
 
 section DLog
 
-noncomputable def experiment (A : G → PMF (ZMod params.q)) : PMF (ZMod 2) :=
+noncomputable def DLogExperiment (A : G → PMF (ZMod params.q)) : PMF (ZMod 2) :=
   PMF.bind scheme.setup (fun h =>
   PMF.bind (A h.1) (fun x' => pure (if params.g^x'.val = params.g^(h.2).val then 1 else 0)))
 
 noncomputable def constructDlogAdversary
-      (A : G → PMF (Adversary.guess (ZMod params.q) G (ZMod params.q)))
+      (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q)))
       (h : G) : PMF (ZMod params.q) :=
     PMF.bind (A h) (fun guess =>
       if guess.o ≠ guess.o' then
@@ -120,13 +120,8 @@ lemma exp_bij (a : ZModMult params.q) (m : ZMod params.q) : Function.Bijective f
     · exact add_sub_cancel m z
     · exact ZModMult.coe_ne_zero a
 
-  have h_pow : params.g^((m + val a * r).val : ℤ) = c := by
-    rw [←hk]
-    subst r
-    rw [h_mod]
+  grind only [ZMod.natCast_val]
 
-  rw [←ZMod.cast_eq_val] at h_pow -- Transfer ↑ and .val back to .cast
-  exact Exists.intro (r) h_pow
 
 noncomputable def expEquiv (a : ZModMult params.q) (m : ZMod params.q) : ZMod params.q ≃ G :=
 Equiv.ofBijective (fun (r : ZMod params.q) => params.g^((m + (val a) * r : ZMod params.q).val : ℤ)) (exp_bij a m)
@@ -233,13 +228,12 @@ end Hiding
 
 section Binding
 
-lemma binding_implies_dlog (a : ZMod params.q) (guess : Adversary.guess (ZMod params.q) G (ZMod params.q)) :
+lemma binding_implies_dlog (a : ZMod params.q) (guess : BindingGuess (ZMod params.q) G (ZMod params.q)) :
     let h := params.g ^ a.val
     let verify := fun (m : ZMod params.q) (c : G) (o : ZMod params.q) => if c = params.g^m.val * h^o.val then (1 : ZMod 2) else 0
     (verify guess.m guess.c guess.o = 1 ∧ verify guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m') →
     (guess.o ≠ guess.o' → params.g^(((guess.m - guess.m') * (guess.o' - guess.o)⁻¹).val) = h) := by
   intro h verify ⟨h1, h2, m_ne⟩ o_ne
-
   simp only [verify] at h1 h2
   split at h1 <;> split at h2
   case' isTrue.isTrue c_eq1 c_eq2 =>
@@ -253,9 +247,10 @@ lemma binding_implies_dlog (a : ZMod params.q) (guess : Adversary.guess (ZMod pa
     rw [← pow_add, ← pow_add] at collision
 
     have h_coprime : (guess.o' - guess.o).val.Coprime params.q := by
-      cases' Nat.coprime_or_dvd_of_prime params.prime_q (guess.o' - guess.o).val with h_cop h_dvd
-      · exact Nat.coprime_comm.mp h_cop
-      · exfalso
+      cases Nat.coprime_or_dvd_of_prime params.prime_q (guess.o' - guess.o).val with
+      | inl h_cop => exact Nat.coprime_comm.mp h_cop
+      | inr h_dvd =>
+        exfalso
         have h_zero : guess.o' - guess.o = 0 := by
           rw [← ZMod.val_eq_zero]
           have h_mod_zero : (guess.o' - guess.o).val % params.q = 0 := Nat.mod_eq_zero_of_dvd h_dvd
@@ -269,112 +264,63 @@ lemma binding_implies_dlog (a : ZMod params.q) (guess : Adversary.guess (ZMod pa
     have h_zmod : (guess.m + a * guess.o : ZMod params.q) = (guess.m' + a * guess.o' : ZMod params.q) := by
       have eq_cast : ((guess.m.val + a.val * guess.o.val : ℕ) : ZMod params.q) =
                     ((guess.m'.val + a.val * guess.o'.val : ℕ) : ZMod params.q) :=
-        (ZMod.natCast_eq_natCast_iff _ _ _).mpr h_congr_nat
+        ZMod.natCast_eq_natCast_iff _ _ _ |>.mpr h_congr_nat
       simp at eq_cast
       exact eq_cast
 
-    have h_lin : a * (guess.o' - guess.o) = guess.m - guess.m' := by grind
-
-    have h_unit : guess.o' - guess.o ≠ 0 := sub_ne_zero.mpr o_ne.symm
-
-    have h_solve_x : a = (guess.m - guess.m') * (guess.o' - guess.o)⁻¹ := by
-      calc a = a * 1                                 := by rw [mul_one]
-        _ = a * ((guess.o' - guess.o) * (guess.o' - guess.o)⁻¹)              := by
-          haveI : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
-          rw [← one_mul a]
-          congr 1
-          have h_field_inv : (guess.o' - guess.o) * (guess.o' - guess.o)⁻¹ = 1 := by
-            apply Field.mul_inv_cancel
-            exact h_unit
-          exact h_field_inv.symm
-        _ = (a * (guess.o' - guess.o)) * (guess.o' - guess.o)⁻¹              := by rw [mul_assoc]
-        _ = (guess.m - guess.m') * (guess.o' - guess.o)⁻¹                    := by rw [h_lin]
-
-    have h_congr_final : ((guess.m - guess.m') * (guess.o' - guess.o)⁻¹).val ≡ a.val [MOD params.q] := by
-      have h1 : (((guess.m - guess.m') * (guess.o' - guess.o)⁻¹).val : ZMod params.q) = (guess.m - guess.m') * (guess.o' - guess.o)⁻¹ :=
-        ZMod.natCast_zmod_val ((guess.m - guess.m') * (guess.o' - guess.o)⁻¹)
-      have h2 : (a.val : ZMod params.q) = a := ZMod.natCast_zmod_val a
-      rw [← ZMod.natCast_eq_natCast_iff]
-      rw [h1, h2]
-      exact h_solve_x.symm
-
-    have h_eq : params.g ^ ((guess.m - guess.m') * (guess.o' - guess.o)⁻¹).val = params.g ^ a.val :=
-      (pow_eq_pow_iff_modEq.mpr (by rwa [ordg_eq_q]))
-
-    rw [h_eq]
+    grind only
   all_goals contradiction
 
 
 lemma binding_as_hard_dlog
-    (A : G → PMF (Adversary.guess (ZMod params.q) G (ZMod params.q))) : -- Pedersen adversary
-    haveI : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩;
-    Commitment.comp_binding_game (scheme) A 1 ≤ experiment (constructDlogAdversary A) 1 := by
-  haveI : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
-  -- Unfold definitions
-  unfold Commitment.comp_binding_game experiment constructDlogAdversary
+    (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))) : -- Pedersen adversary
+    Commitment.comp_binding_game (scheme) A 1 ≤ DLogExperiment (constructDlogAdversary A) 1 := by
+  unfold Commitment.comp_binding_game DLogExperiment constructDlogAdversary
+
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
 
-  -- Expand the bind applications
   rw [PMF.bind_apply, PMF.bind_apply]
-
-  -- Both sum over the same type: G × ZMod q (the pairs from setup)
-  -- We need pointwise inequality
   apply ENNReal.tsum_le_tsum
   intro ⟨h, a⟩
 
-  -- Key observation: setup only returns pairs (g^x.val, x)
-  -- So if h ≠ g^a.val, the probability of this pair is 0 and inequality holds trivially
   by_cases h_case : h = params.g^a.val
 
   · -- Case: h = g^a.val (pair is in support of setup)
-    subst h_case  -- Replace h with g^a.val everywhere
-
-    -- Now we have h = g^a.val as needed!
+    subst h_case
     apply mul_le_mul_right
-
-    -- Now compare the inner probabilities
-    -- Continue with the proof that was already working
-    -- First, use bind associativity on RHS to flatten the nested binds
     conv_rhs => rw [PMF.bind_bind]
 
-    -- Now both have structure: (A (g^a.val)).bind (fun guess => ...) 1
-    -- Expand the bind application
+    -- Same structure as above
     rw [PMF.bind_apply, PMF.bind_apply]
-
-    -- Now both are sums over Adversary.guess
     apply ENNReal.tsum_le_tsum
     intro guess
 
     apply mul_le_mul_right
-
-    -- For each guess, show:
-    -- (if [binding succeeds] then pure 1 else pure 0) 1 ≤
-    -- ((if o≠o' then pure x' else uniform).bind (λ x'. pure (if g^x'=g^a then 1 else 0))) 1
 
     simp only [ite_eq_left_iff, zero_ne_one, imp_false, Decidable.not_not, ne_eq, ite_not,
       PMF.bind_apply, tsum_fintype]
     rw [@DFunLike.ite_apply]
     split_ifs with h₁ h₂
 
-    · -- Case 1: h₁ (binding) AND h₂ (o = o')
-      -- This is the contradiction case: o = o' but binding succeeds
+    · -- Case 1: h₁ binding collision AND h₂ (o = o')
+      -- This is the contradiction case: o = o'
       exfalso
       obtain ⟨eq1, eq2, m_ne⟩ := h₁
-      -- Since h₂: o = o', we have (g^a.val)^o.val = (g^a.val)^o'.val
+
       have ho_eq : (params.g^a.val)^guess.o.val = (params.g^a.val)^guess.o'.val := by
         rw [h₂]
-      -- So: g^m.val * (g^a.val)^o.val = g^m'.val * (g^a.val)^o.val
+
       have collision : params.g^guess.m.val * (params.g^a.val)^guess.o.val = params.g^guess.m'.val * (params.g^a.val)^guess.o.val := by
         calc params.g^guess.m.val * (params.g^a.val)^guess.o.val
             = guess.c := eq1.symm
           _ = params.g^guess.m'.val * (params.g^a.val)^guess.o'.val := eq2
           _ = params.g^guess.m'.val * (params.g^a.val)^guess.o.val := by rw [← ho_eq]
-      -- Cancel (g^a.val)^o.val from both sides
+
       have g_eq : params.g^guess.m.val = params.g^guess.m'.val := mul_right_cancel collision
 
       have h_congr : guess.m.val ≡ guess.m'.val [MOD params.q] := by
         simpa [ordg_eq_q] using (pow_eq_pow_iff_modEq.mp g_eq)
-      -- Therefore m = m' in ZMod q
+
       have m_eq : guess.m = guess.m' := by
         have eq_cast : ((guess.m.val : ℕ) : ZMod params.q) = ((guess.m'.val : ℕ) : ZMod params.q) :=
           ZMod.natCast_eq_natCast_iff guess.m.val guess.m'.val params.q |>.mpr h_congr
@@ -382,88 +328,72 @@ lemma binding_as_hard_dlog
         exact eq_cast
       exact m_ne m_eq
 
-    · -- Case 2: Binding succeeds (h₁) AND o ≠ o' (¬h₂)
+    · -- Case 2: Binding collision (h₁) AND o ≠ o' (¬h₂)
       -- This is the main case where we use binding_implies_dlog
       have h_o_ne : guess.o ≠ guess.o' := h₂
       let x' := (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
 
-      -- Convert h₁ to the form expected by binding_implies_dlog
       have h₁' : (let h := params.g^a.val;
                   let verify := fun m c o => if c = params.g^m.val * h^o.val then (1 : ZMod 2) else 0;
                   verify guess.m guess.c guess.o = 1 ∧ verify guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m') := by
-        obtain ⟨eq1, eq2, m_ne⟩ := h₁
-        simp only []
-        refine ⟨?_, ?_, m_ne⟩
-        · split
-          · rfl
-          · contradiction
-        · split
-          · rfl
-          · contradiction
+        grind only
 
-      -- By binding_implies_dlog, g^x'.val = g^a.val
       have h_dlog : params.g^x'.val = params.g^a.val := by
         apply binding_implies_dlog a guess h₁' h_o_ne
 
       -- The RHS is a sum over a single-element distribution (pure x')
       -- The sum includes the term for x = x', which equals 1
       have h_term : (PMF.pure x') x' * (PMF.pure (if params.g^x'.val = params.g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) = 1 := by
-        rw [PMF.pure_apply, PMF.pure_apply]
         simp only [h_dlog]
+        rw [PMF.pure_apply, PMF.pure_apply]
         norm_num
+
       have h_zero : ∀ x ∈ Finset.univ, x ∉ ({x'} : Finset (ZMod params.q)) →
                     (PMF.pure x') x * (PMF.pure (if params.g^x.val = params.g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) = 0 := by
         intros x _ hx
         rw [PMF.pure_apply]
         simp only [Finset.mem_singleton] at hx
         simp [hx]
+
       have h_sum_ge : (PMF.pure x') x' * (PMF.pure (if params.g^x'.val = params.g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) ≤
                       ∑ x, (PMF.pure x') x * (PMF.pure (if params.g^x.val = params.g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) := by
         rw [← Finset.sum_subset (Finset.subset_univ {x'}) h_zero]
         simp only [Finset.sum_singleton]
         rfl
+
       calc (PMF.pure (1 : ZMod 2)) (1 : ZMod 2)
           = 1 := by rw [PMF.pure_apply]; norm_num
         _ = (PMF.pure x') x' * (PMF.pure (if params.g^x'.val = params.g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) := h_term.symm
         _ ≤ ∑ x, (PMF.pure x') x * (PMF.pure (if params.g^x.val = params.g^a.val then (1 : ZMod 2) else 0)) (1 : ZMod 2) := h_sum_ge
 
-    · -- Case 3: Binding fails (¬h₁) AND o = o' (h✝)
+    · -- Case 3: No collision (¬h₁) AND o = o' (h✝)
       show (PMF.pure (0 : ZMod 2)) (1 : ZMod 2) ≤ _
       rw [PMF.pure_apply]
       norm_num
 
-    · -- Case 4: Binding fails (¬h₁) AND o ≠ o' (¬h✝)
+    · -- Case 4: No collision (¬h₁) AND o ≠ o' (¬h✝)
       show (PMF.pure (0 : ZMod 2)) (1 : ZMod 2) ≤ _
       rw [PMF.pure_apply]
       norm_num
 
   · -- Case neg: h ≠ g^a.val (pair is NOT in support)
-    -- Setup only returns pairs of the form (g^x.val, x)
-    -- So if h ≠ g^a.val, then (h, a) has probability 0 in the setup distribution
-    -- Therefore both sides are 0 * something = 0, and 0 ≤ 0
     have h_prob_zero : ((PMF.uniformOfFintype (ZModMult params.q)).bind fun a_mult => PMF.pure (params.g^(val a_mult).val, val a_mult)) (h, a) = 0 := by
       rw [PMF.bind_apply, tsum_fintype]
       apply Finset.sum_eq_zero
       intros a_mult _
       rw [PMF.pure_apply, PMF.uniformOfFintype_apply]
       split_ifs with h_eq
-      · -- If (h, a) = (g^(val a_mult).val, val a_mult)
-        -- Then h = g^(val a_mult).val and a = val a_mult
-        exfalso
-        have eq_h : h = params.g^(val a_mult).val := (Prod.mk.injEq _ _ _ _).mp h_eq |>.1
-        have eq_a : a = val a_mult := (Prod.mk.injEq _ _ _ _).mp h_eq |>.2
-        rw [← eq_a] at eq_h
-        exact h_case eq_h
-      · simp
+      · grind only
+      · simp only [mul_zero]
     change ((PMF.uniformOfFintype (ZModMult params.q)).bind fun a_mult => PMF.pure (params.g^(val a_mult).val, val a_mult)) (h, a) * _ ≤
            ((PMF.uniformOfFintype (ZModMult params.q)).bind fun a_mult => PMF.pure (params.g^(val a_mult).val, val a_mult)) (h, a) * _
     rw [h_prob_zero]
     simp only [zero_mul, le_refl]
 
 theorem computational_binding :
-  ∀ (ε : ENNReal),
-    (∀ (A' : G → PMF (ZMod params.q)), experiment A' 1 ≤ ε) →
-    (∀ (A : G → PMF (Adversary.guess (ZMod params.q) G (ZMod params.q))),
+    ∀ (ε : ENNReal),
+    (∀ (A' : G → PMF (ZMod params.q)), DLogExperiment A' 1 ≤ ε) →
+    (∀ (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))),
     Commitment.comp_binding_game (@scheme G params) A 1 ≤ ε) := by
   intro ε A' A
   exact le_trans (binding_as_hard_dlog A) (A' (constructDlogAdversary A))
