@@ -19,6 +19,10 @@ def ZModMult (q : ℕ) [NeZero q] := {a : ZMod q // a ≠ 0}
 -- Helper function to extract the value from ZModMult
 def val {q : ℕ} [NeZero q] (a : ZModMult q) : ZMod q := a.val
 
+lemma ZModMult.coe_ne_zero {q : ℕ} [NeZero q] (a : ZModMult q) : (val a : ZMod q) ≠ 0 :=
+    a.property
+
+
 -- Fintype instance for ZModMult
 instance {q : ℕ} [NeZero q] : Fintype (ZModMult q) :=
   Fintype.subtype ((Finset.univ : Finset (ZMod q)).erase 0) (by simp [Finset.mem_erase])
