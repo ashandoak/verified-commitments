@@ -65,6 +65,63 @@ noncomputable def scheme : CommitmentScheme (ZMod params.q) G (ZMod params.q) G 
     verify := verify
   }
 
+
+theorem pedersen_correctness : Commitment.correctness (@scheme G params) := by
+  unfold Commitment.correctness
+  intro h m
+  unfold scheme commit verify
+  simp only [pure]
+  ext b
+  simp only [PMF.bind_apply, PMF.pure_apply, PMF.uniformOfFintype_apply, tsum_fintype, Finset.sum_mul]
+  -- Exchange the order of summation
+  rw [Finset.sum_comm]
+  simp only [mul_ite, mul_one, mul_zero]
+  -- For each r, the inner sum over x: only x = (g^m*h^r, r) contributes
+  have h_inner : ∀ r : ZMod params.q,
+    (∑ x : G × ZMod params.q,
+      if b = (if x.1 = params.g ^ m.val * h ^ x.2.val then 1 else 0)
+      then if x = (params.g ^ m.val * h ^ r.val, r)
+           then ((↑(Fintype.card (ZMod params.q)))⁻¹ : ENNReal)
+           else 0
+      else 0) =
+    if b = 1 then ((↑(Fintype.card (ZMod params.q)))⁻¹ : ENNReal) else 0 := by
+    intro r
+    -- The sum collapses to checking x = (g^m*h^r, r)
+    have : (∑ x : G × ZMod params.q,
+      if b = (if x.1 = params.g ^ m.val * h ^ x.2.val then 1 else 0)
+      then if x = (params.g ^ m.val * h ^ r.val, r)
+           then ((↑(Fintype.card (ZMod params.q)))⁻¹ : ENNReal)
+           else 0
+      else 0) =
+      (if b = (if (params.g ^ m.val * h ^ r.val) = params.g ^ m.val * h ^ r.val then 1 else 0)
+       then ((↑(Fintype.card (ZMod params.q)))⁻¹ : ENNReal)
+       else 0) := by
+      -- The sum has at most one non-zero term, when x = (g^m*h^r, r)
+      trans (∑ x : G × ZMod params.q,
+        if x = (params.g ^ m.val * h ^ r.val, r)
+        then (if b = (if x.1 = params.g ^ m.val * h ^ x.2.val then 1 else 0)
+              then ((↑(Fintype.card (ZMod params.q)))⁻¹ : ENNReal)
+              else 0)
+        else 0)
+      · congr 1
+        ext x
+        by_cases hx : x = (params.g ^ m.val * h ^ r.val, r)
+        · simp [hx]
+        · simp [hx]
+      · rw [Finset.sum_ite_eq']
+        simp
+    rw [this]
+    simp
+  simp_rw [h_inner]
+  by_cases hb : b = 1
+  · subst hb
+    simp only [ite_true, Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
+    rw [ENNReal.mul_inv_cancel]
+    · simp [params.prime_q.ne_zero]
+    · simp [ENNReal.natCast_ne_top]
+  · simp [hb]
+
+
 noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (ZModMult params.q)
 
 /- ========================================
