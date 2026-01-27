@@ -1,3 +1,6 @@
+-- From cryptolib licensed under Apache 2.0
+-- https://github.com/joeylupo/cryptolib
+
 /-
  -----------------------------------------------------------
   Correctness and semantic security of ElGamal public-key
