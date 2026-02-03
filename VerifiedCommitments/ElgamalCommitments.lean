@@ -16,12 +16,12 @@ namespace DDH
 
 variable (G : Type) [Fintype G] [Group G]
           (g : G) (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g)
-          (q : ℕ) [Fact (0 < q)] (G_card_q : Fintype.card G = q)
+          (q : ℕ) [NeZero q] [Fact (0 < q)] (G_card_q : Fintype.card G = q)
           (D : G → G → G → PMF (ZMod 2))
 
 include g_gen_G G_card_q
 
-instance {q : ℕ} : Fintype (ZMod q) := sorry
+instance : Fintype (ZMod q) := ZMod.fintype q
 
 noncomputable def Game0 : PMF (ZMod 2) :=
 do
@@ -52,8 +52,8 @@ namespace PKE
 variable {K M C O A_state: Type} [DecidableEq M]
           (setup : PMF (K × O))
           (commit : K → M → PMF (C × O))
-          (verify : K → M → C → O → ZMod 2)
-          (A1 : K → PMF (M × M × A_state))
+          (verify : K → M → C → O → ZMod 2) -- This confusing C is (G × G), but also just G?
+          (A1 : K → PMF ((M × M) × A_state))
           (A2 : C → A_state → PMF (ZMod 2))
 
 /-
@@ -63,8 +63,8 @@ variable {K M C O A_state: Type} [DecidableEq M]
 noncomputable def commit_verify (m : M) : PMF (ZMod 2) :=
 do
   let (h, _) ← setup
-  let c ← commit h m
-  pure (verify h m c.1 c.2)
+  let (c, o) ← commit h m
+  pure (verify h m c o)
 
 /-
   A public-key encryption protocol is correct if decryption undoes
@@ -79,7 +79,7 @@ def pke_correctness : Prop := ∀ (m : M), commit_verify setup commit verify m =
 noncomputable def ComputationalHidingGame : PMF (ZMod 2):=
 do
   let (h, _) ← setup
-  let (m, m', a_state) ← A1 h
+  let ((m, m'), a_state) ← A1 h
   let b ← PMF.uniformOfFintype (ZMod 2)
   let (c, _) ← commit h (if b = 0 then m else m')
   let b' ← A2 c a_state
@@ -107,17 +107,15 @@ class ElgamalParameters (G : Type) extends
   g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
   G_card_q : Fintype.card G = q
   A_state : Type
-  A1 : G → PMF (G × G × A_state)
-  A2 : G → G → A_state → PMF (ZMod 2)
+  A1 : G → PMF ((G × G) × A_state)
+  A2 : G → G → A_state → PMF (ZMod 2) -- what deoes this need to be? Has to match what the distinguisher needs...
 
 -- Make instances available
 variable {G : Type} [params : ElgamalParameters G]
 instance : DecidableEq G := params.decidable_G
 instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
 
--- noncomputable section
-
-
+-- Should this match the A' := A from Bruce's notes?
 def A2' : G × G → params.A_state → PMF (ZMod 2) := fun (gg : G × G) => params.A2 gg.1 gg.2
 
 -- generates a public key `g^x.val`, and private key `x`
@@ -132,8 +130,8 @@ do
   let r ← PMF.uniformOfFintype (ZMod params.q)
   pure ((params.g^r.val, h^r.val * m), r)
 
--- def verify (h m c : G) (o : ZMod params.q) : ZMod 2 :=
---   (commit h m).bind (fun (x, _, _) => if x = c then 1 else 0)
+-- def verify (h m : G) (c : (G × G)) (o : ZMod params.q) : ZMod 2 := -- verify shouldn't run commit directly, correct? Verify is only ever passed the deterministic values - if we need to run both we have commit_verify above
+--   (commit h m).bind (fun (c', _) => if c' = c then 1 else 0)
 
 def verify (h m : G) (c : (G × G)) (o : ZMod params.q) : ZMod 2 :=
   if c.2 = h^o.val * m then 1 else 0
@@ -151,13 +149,7 @@ noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G :=
   -----------------------------------------------------------
 -/
 
-
-def elgamal_commitment_correctness_prop : Prop :=
-  ∀ (m : G), PKE.commit_verify setup commit verify m = pure 1
-
-
-theorem elgamal_commitment_correctness : @elgamal_commitment_correctness_prop G params := by
-  simp [elgamal_commitment_correctness_prop]
+theorem elgamal_pke_correctness : @PKE.pke_correctness G G (G × G) (ZMod params.q) setup commit verify := by
   intro m
   unfold setup commit verify PKE.commit_verify
   simp only [bind_pure_comp, Functor.map_map, bind_map_left]
@@ -168,6 +160,20 @@ theorem elgamal_commitment_correctness : @elgamal_commitment_correctness_prop G 
   simp only [Function.comp_apply]
   rfl
 
+theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G params) := by
+  intro h m
+  show PMF.bind (scheme.commit h m) _ = _
+  simp only [scheme]
+  unfold commit verify
+  simp only [bind_pure_comp, Functor.map, PMF.bind_bind, Function.comp_apply, PMF.pure_bind, ↓reduceIte, PMF.bind_const]
+
+/-
+  -----------------------------------------------------------
+  Computational Hiding
+  -----------------------------------------------------------
+-/
+theorem computational_hiding : ∀ (ε : ENNReal), Commitment.computational_hiding (@scheme G params) ε := by
+  sorry
 
 
 /-
@@ -178,10 +184,10 @@ theorem elgamal_commitment_correctness : @elgamal_commitment_correctness_prop G 
 
 noncomputable def D (gx gy gz : G) : PMF (ZMod 2) :=
 do
-  let m ← params.A1 gx
+  let ((m₀, m₁), a_state) ← params.A1 gx
   let b ← PMF.uniformOfFintype (ZMod 2)
-  let mb ← pure (if b = 0 then m.1 else m.2.1)
-  let b' ← params.A2 gy (gz * mb) m.2.2
+  let mb ← pure (if b = 0 then m₀ else m₁)
+  let b' ← params.A2 gy (gz * mb) a_state
   pure (1 + b + b')
 
 /-
@@ -189,8 +195,8 @@ do
   winning the semantic security game (i.e. guessing the correct bit),
   w.r.t. ElGamal is equal to the probability of D winning the game DDH0.
 -/
-theorem SSG_DDH0 : PKE.SSG keygen encrypt params.A1 A2' =  DDH.Game0 G params.g params.q D := by
-  simp only [PKE.SSG, DDH.Game0, bind, keygen, encrypt, D]
+theorem ComputationalHiding_DDH0 : PKE.ComputationalHidingGame setup commit params.A1 A2' =  DDH.Game0 G params.g params.q D := by
+  simp only [PKE.ComputationalHidingGame, DDH.Game0, bind, setup, commit, D]
   simp_rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod params.q))]
   apply bind_skip'
   intro x
@@ -209,27 +215,26 @@ noncomputable def Game1 : PMF (ZMod 2) :=
 do
   let x ← PMF.uniformOfFintype (ZMod params.q)
   let y ← PMF.uniformOfFintype (ZMod params.q)
-  let m ← params.A1 (params.g^x.val)
+  let ((m₀, m₁), a_state) ← params.A1 (params.g^x.val)
   let b ← PMF.uniformOfFintype (ZMod 2)
   let ζ ← (do
     let z ← PMF.uniformOfFintype (ZMod params.q)
-    let mb ← pure (if b = 0 then m.1 else m.2.1)
+    let mb ← pure (if b = 0 then m₀ else m₁)
     pure (params.g^z.val * mb))
-  let b' ← params.A2 (params.g^y.val) ζ m.2.2
+  let b' ← params.A2 (params.g^y.val) ζ a_state
   pure (1 + b + b')
 
 noncomputable def Game2 : PMF (ZMod 2) :=
 do
   let x ← PMF.uniformOfFintype (ZMod params.q)
   let y ← PMF.uniformOfFintype (ZMod params.q)
-  let m ← params.A1 (params.g^x.val)
+  let (_, a_state) ← params.A1 (params.g^x.val)
   let b ← PMF.uniformOfFintype (ZMod 2)
   let ζ ← (do
     let z ← PMF.uniformOfFintype (ZMod params.q)
     pure (params.g^z.val))
-  let b' ← params.A2 (params.g^y.val) ζ m.2.2
+  let b' ← params.A2 (params.g^y.val) ζ a_state
   pure (1 + b + b')
-
 
 
 /-
@@ -438,9 +443,9 @@ variable (ε : ENNReal)
   therefore ElGamal is, by definition, semantically secure.
 -/
 theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D ε) :
-    PKE.pke_semantic_security keygen encrypt params.A1 A2' ε := by
+    PKE.pke_semantic_security setup commit params.A1 A2' ε := by
   simp only [PKE.pke_semantic_security]
-  rw [SSG_DDH0]
+  rw [ComputationalHiding_DDH0]
   have h : ((PMF.uniformOfFintype (ZMod 2)) 1) = 1/2 := by
     simp only [PMF.uniformOfFintype_apply, ZMod.card, Nat.cast_ofNat, one_div]
   rw [← h]
