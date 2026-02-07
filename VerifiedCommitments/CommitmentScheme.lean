@@ -66,8 +66,8 @@ def comp_hiding_game (scheme : CommitmentScheme M C O K)
 
 def computational_hiding (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
   ∀ (A : K → C → PMF (ZMod 2)) (m₀ m₁ : M),
-  comp_hiding_game scheme A m₀ 1 - comp_hiding_game scheme A m₁ 1 ≤ ε ||
-  comp_hiding_game scheme A m₁ 1 - comp_hiding_game scheme A m₀ 1 ≤ ε
+  max (comp_hiding_game scheme A m₀ 1 - comp_hiding_game scheme A m₁ 1)
+      (comp_hiding_game scheme A m₁ 1 - comp_hiding_game scheme A m₀ 1) ≤ ε
 
 end
 
