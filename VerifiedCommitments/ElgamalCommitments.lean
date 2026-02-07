@@ -52,9 +52,8 @@ namespace PKE
 variable {K M C O A_state: Type} [DecidableEq M]
           (setup : PMF (K × O))
           (commit : K → M → PMF (C × O))
-          (verify : K → M → C → O → ZMod 2) -- This confusing C is (G × G), but also just G?
-          (A1 : K → PMF ((M × M) × A_state))
-          (A2 : C → A_state → PMF (ZMod 2))
+          (verify : K → M → C → O → ZMod 2)
+          (adversary : TwoStageAdversary K M C)
 
 /-
   Executes the a public-key protocol defined by keygen,
@@ -79,17 +78,17 @@ def pke_correctness : Prop := ∀ (m : M), commit_verify setup commit verify m =
 noncomputable def ComputationalHidingGame : PMF (ZMod 2):=
 do
   let (h, _) ← setup
-  let ((m, m'), a_state) ← A1 h
+  let ((m, m'), a_state) ← adversary.stage1 h
   let b ← PMF.uniformOfFintype (ZMod 2)
   let (c, _) ← commit h (if b = 0 then m else m')
-  let b' ← A2 c a_state
+  let b' ← adversary.stage2 c a_state
   pure (1 + b + b')
 
 
 -- SSG(A) denotes the event that A wins the semantic security game
 --local notation `Pr[SSG(A)]` := (SSG keygen encrypt A1 A2 1 : ℝ)
 
-def pke_semantic_security (ε : ENNReal) : Prop :=  (ComputationalHidingGame setup commit A1 A2 1) - 1/2 ≤ ε
+def pke_semantic_security (ε : ENNReal) : Prop :=  (ComputationalHidingGame setup commit adversary 1) - 1/2 ≤ ε
 
 end PKE
 
@@ -106,9 +105,7 @@ class ElgamalParameters (G : Type) extends
   card_eq : Fintype.card G = q
   g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
   G_card_q : Fintype.card G = q
-  A_state : Type
-  A1 : G → PMF ((G × G) × A_state)
-  A2 : (G × G) → A_state → PMF (ZMod 2) -- what deoes this need to be? Has to match what the distinguisher needs...
+  adversary : TwoStageAdversary G G (G × G)
 
 -- Make instances available
 variable {G : Type} [params : ElgamalParameters G]
@@ -159,14 +156,6 @@ theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G param
   unfold commit verify
   simp only [bind_pure_comp, Functor.map, PMF.bind_bind, Function.comp_apply, PMF.pure_bind, ↓reduceIte, PMF.bind_const]
 
-/-
-  -----------------------------------------------------------
-  Computational Hiding
-  -----------------------------------------------------------
--/
-theorem computational_hiding : ∀ (ε : ENNReal), Commitment.computational_hiding (@scheme G params) ε := by
-  sorry
-
 
 /-
   -----------------------------------------------------------
@@ -176,10 +165,10 @@ theorem computational_hiding : ∀ (ε : ENNReal), Commitment.computational_hidi
 
 noncomputable def D (gx gy gz : G) : PMF (ZMod 2) :=
 do
-  let ((m₀, m₁), a_state) ← params.A1 gx
+  let ((m₀, m₁), a_state) ← params.adversary.stage1 gx
   let b ← PMF.uniformOfFintype (ZMod 2)
   let mb ← pure (if b = 0 then m₀ else m₁)
-  let b' ← params.A2 ⟨gy, (gz * mb)⟩ a_state
+  let b' ← params.adversary.stage2 ⟨gy, (gz * mb)⟩ a_state
   pure (1 + b + b')
 
 /-
@@ -187,7 +176,7 @@ do
   winning the semantic security game (i.e. guessing the correct bit),
   w.r.t. ElGamal is equal to the probability of D winning the game DDH0.
 -/
-theorem ComputationalHiding_DDH0 : PKE.ComputationalHidingGame setup commit params.A1 params.A2 =  DDH.Game0 G params.g params.q D := by
+theorem ComputationalHiding_DDH0 : PKE.ComputationalHidingGame setup commit params.adversary =  DDH.Game0 G params.g params.q D := by
   simp only [PKE.ComputationalHidingGame, DDH.Game0, bind, setup, commit, D]
   simp_rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod params.q))]
   apply bind_skip'
@@ -206,25 +195,25 @@ noncomputable def Game1 : PMF (ZMod 2) :=
 do
   let x ← PMF.uniformOfFintype (ZMod params.q)
   let y ← PMF.uniformOfFintype (ZMod params.q)
-  let ((m₀, m₁), a_state) ← params.A1 (params.g^x.val)
+  let ((m₀, m₁), a_state) ← params.adversary.stage1 (params.g^x.val)
   let b ← PMF.uniformOfFintype (ZMod 2)
   let ζ ← (do
     let z ← PMF.uniformOfFintype (ZMod params.q)
     let mb ← pure (if b = 0 then m₀ else m₁)
     pure (params.g^z.val * mb))
-  let b' ← params.A2 ⟨(params.g^y.val), ζ⟩ a_state
+  let b' ← params.adversary.stage2 ⟨(params.g^y.val), ζ⟩ a_state
   pure (1 + b + b')
 
 noncomputable def Game2 : PMF (ZMod 2) :=
 do
   let x ← PMF.uniformOfFintype (ZMod params.q)
   let y ← PMF.uniformOfFintype (ZMod params.q)
-  let (_, a_state) ← params.A1 (params.g^x.val)
+  let (_, a_state) ← params.adversary.stage1 (params.g^x.val)
   let b ← PMF.uniformOfFintype (ZMod 2)
   let ζ ← (do
     let z ← PMF.uniformOfFintype (ZMod params.q)
     pure (params.g^z.val))
-  let b' ← params.A2 ⟨(params.g^y.val), ζ⟩ a_state
+  let b' ← params.adversary.stage2 ⟨(params.g^y.val), ζ⟩ a_state
   pure (1 + b + b')
 
 
@@ -239,7 +228,7 @@ theorem Game1_DDH1 : @Game1 G params = DDH.Game1 G params.g params.q D := by
   intro x
   apply bind_skip'
   intro y
-  simp_rw [PMF.bind_bind (params.A1 _)]
+  simp_rw [PMF.bind_bind (params.adversary.stage1 _)]
   conv_rhs => rw [PMF.bind_comm (PMF.uniformOfFintype (ZMod params.q))]
   apply bind_skip'
   intro m
@@ -434,7 +423,7 @@ variable (ε : ENNReal)
   therefore ElGamal is, by definition, semantically secure.
 -/
 theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D ε) :
-    PKE.pke_semantic_security setup commit params.A1 params.A2 ε := by
+    PKE.pke_semantic_security setup commit params.adversary ε := by
   simp only [PKE.pke_semantic_security]
   rw [ComputationalHiding_DDH0]
   have h : ((PMF.uniformOfFintype (ZMod 2)) 1) = 1/2 := by
@@ -446,5 +435,11 @@ theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D 
   exact DDH_G
 
 
+
+theorem computational_hiding_from_ddh
+    (DDH_assumption : ∀ (D : G → G → G → PMF (ZMod 2)), ∃ ε, DDH.Assumption G params.g params.q D ε) :
+    ∃ ε, Commitment.computational_hiding (@scheme G params) ε := by
+
+  sorry
 
 end Elgamal
