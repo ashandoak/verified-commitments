@@ -48,50 +48,6 @@ def Assumption (ε : ENNReal) : Prop := (Game0 G g q D 1) - (Game1 G g q D 1) �
 
 end DDH
 
-namespace PKE
-variable {K M C O A_state: Type} [DecidableEq M]
-          (setup : PMF (K × O))
-          (commit : K → M → PMF (C × O))
-          (verify : K → M → C → O → ZMod 2)
-          (adversary : TwoStageAdversary K M C)
-
-/-
-  Executes the a public-key protocol defined by keygen,
-  encrypt, and decrypt
--/
-noncomputable def commit_verify (m : M) : PMF (ZMod 2) :=
-do
-  let (h, _) ← setup
-  let (c, o) ← commit h m
-  pure (verify h m c o)
-
-/-
-  A public-key encryption protocol is correct if decryption undoes
-  encryption with probability 1
--/
-def pke_correctness : Prop := ∀ (m : M), commit_verify setup commit verify m = pure 1
-
-/-
-  The semantic security game.
-  Returns 1 if the attacker A2 guesses the correct bit
--/
--- noncomputable def ComputationalHidingGame : PMF (ZMod 2):=
--- do
---   let (h, _) ← setup
---   let ((m, m'), a_state) ← adversary.stage1 h
---   let b ← PMF.uniformOfFintype (ZMod 2)
---   let (c, _) ← commit h (if b = 0 then m else m')
---   let b' ← adversary.stage2 c a_state
---   pure (1 + b + b')
-
-
--- SSG(A) denotes the event that A wins the semantic security game
---local notation `Pr[SSG(A)]` := (SSG keygen encrypt A1 A2 1 : ℝ)
-
--- def pke_semantic_security (ε : ENNReal) : Prop :=  (ComputationalHidingGame setup commit adversary 1) - 1/2 ≤ ε
-
-end PKE
-
 namespace Elgamal
 
 class ElgamalParameters (G : Type) extends
@@ -105,7 +61,6 @@ class ElgamalParameters (G : Type) extends
   card_eq : Fintype.card G = q
   g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
   G_card_q : Fintype.card G = q
-  adversary : TwoStageAdversary G G (G × G)
 
 -- Make instances available
 variable {G : Type} [params : ElgamalParameters G]
@@ -131,26 +86,11 @@ noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G :=
   commit := commit,
   verify := verify
 }
-
-def pke_semantic_security' (ε : ENNReal) : Prop := (Commitment.comp_hiding_game scheme params.adversary) 1 - 1/2 ≤ ε
-
-
 /-
   -----------------------------------------------------------
   Proof of correctness of ElGamal
   -----------------------------------------------------------
 -/
-
-theorem elgamal_pke_correctness : @PKE.pke_correctness G G (G × G) (ZMod params.q) setup commit verify := by
-  intro m
-  unfold setup commit verify PKE.commit_verify
-  simp only [bind_pure_comp, Functor.map_map, bind_map_left]
-  apply bind_skip_const'
-  intro x
-  apply bind_skip_const'
-  intro y
-  simp only [Function.comp_apply]
-  rfl
 
 theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G params) := by
   intro h m
@@ -166,14 +106,6 @@ theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G param
   -----------------------------------------------------------
 -/
 
-noncomputable def D (gx gy gz : G) : PMF (ZMod 2) :=
-do
-  let ((m₀, m₁), a_state) ← params.adversary.stage1 gx
-  let b ← PMF.uniformOfFintype (ZMod 2)
-  let mb ← pure (if b = 0 then m₀ else m₁)
-  let b' ← params.adversary.stage2 ⟨gy, (gz * mb)⟩ a_state
-  pure (1 + b + b')
-
 noncomputable def D_from_adversary (A : TwoStageAdversary G G (G × G)) : G → G → G → PMF (ZMod 2) :=
   fun gx gy gz => do
     let ((m₀, m₁), state) ← A.stage1 gx
@@ -187,8 +119,8 @@ noncomputable def D_from_adversary (A : TwoStageAdversary G G (G × G)) : G → 
   winning the semantic security game (i.e. guessing the correct bit),
   w.r.t. ElGamal is equal to the probability of D winning the game DDH0.
 -/
-theorem ComputationalHiding_DDH0 : Commitment.comp_hiding_game scheme params.adversary =  DDH.Game0 G params.g params.q D := by
-  simp only [Commitment.comp_hiding_game, DDH.Game0, bind, scheme, setup, commit, D]
+theorem ComputationalHiding_DDH0 (A : TwoStageAdversary G G (G × G)) : Commitment.comp_hiding_game scheme A =  DDH.Game0 G params.g params.q (D_from_adversary A) := by
+  simp only [Commitment.comp_hiding_game, DDH.Game0, bind, scheme, setup, commit, D_from_adversary]
   simp_rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod params.q))]
   apply bind_skip'
   intro x
@@ -202,29 +134,29 @@ theorem ComputationalHiding_DDH0 : Commitment.comp_hiding_game scheme params.adv
   intro y
   rw [pow_mul params.g x.val y.val]
 
-noncomputable def Game1 : PMF (ZMod 2) :=
+noncomputable def Game1 (A : TwoStageAdversary G G (G × G)) : PMF (ZMod 2) :=
 do
   let x ← PMF.uniformOfFintype (ZMod params.q)
   let y ← PMF.uniformOfFintype (ZMod params.q)
-  let ((m₀, m₁), a_state) ← params.adversary.stage1 (params.g^x.val)
+  let ((m₀, m₁), a_state) ← A.stage1 (params.g^x.val)
   let b ← PMF.uniformOfFintype (ZMod 2)
   let ζ ← (do
     let z ← PMF.uniformOfFintype (ZMod params.q)
     let mb ← pure (if b = 0 then m₀ else m₁)
     pure (params.g^z.val * mb))
-  let b' ← params.adversary.stage2 ⟨(params.g^y.val), ζ⟩ a_state
+  let b' ← A.stage2 ⟨(params.g^y.val), ζ⟩ a_state
   pure (1 + b + b')
 
-noncomputable def Game2 : PMF (ZMod 2) :=
+noncomputable def Game2 (A : TwoStageAdversary G G (G × G)) : PMF (ZMod 2) :=
 do
   let x ← PMF.uniformOfFintype (ZMod params.q)
   let y ← PMF.uniformOfFintype (ZMod params.q)
-  let (_, a_state) ← params.adversary.stage1 (params.g^x.val)
+  let (_, a_state) ← A.stage1 (params.g^x.val)
   let b ← PMF.uniformOfFintype (ZMod 2)
   let ζ ← (do
     let z ← PMF.uniformOfFintype (ZMod params.q)
     pure (params.g^z.val))
-  let b' ← params.adversary.stage2 ⟨(params.g^y.val), ζ⟩ a_state
+  let b' ← A.stage2 ⟨(params.g^y.val), ζ⟩ a_state
   pure (1 + b + b')
 
 
@@ -233,28 +165,28 @@ do
   winning Game1 (i.e. guessing the correct bit) is equal to the
   probability of D winning the game DDH1.
 -/
-theorem Game1_DDH1 : @Game1 G params = DDH.Game1 G params.g params.q D := by
-  simp only [DDH.Game1, Game1, bind, D]
+theorem Game1_DDH1 (A : TwoStageAdversary G G (G × G)) : @Game1 G params A = DDH.Game1 G params.g params.q (D_from_adversary A):= by
+  simp only [DDH.Game1, Game1, bind, D_from_adversary]
+  simp only [PMF.bind_bind, mul_ite]
   apply bind_skip'
   intro x
   apply bind_skip'
   intro y
-  simp_rw [PMF.bind_bind (params.adversary.stage1 _)]
+  -- simp_rw [PMF.bind_bind (A.stage1 _)]
   conv_rhs => rw [PMF.bind_comm (PMF.uniformOfFintype (ZMod params.q))]
   apply bind_skip'
   intro m
-  simp_rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod params.q))]
+  -- simp_rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod params.q))]
   conv_lhs => rw [PMF.bind_comm (PMF.uniformOfFintype (ZMod 2))]
   apply bind_skip'
   intro z
-  conv_rhs => rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod 2))]
+  -- conv_rhs => rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod 2))]
   apply bind_skip'
   intro b
-  simp_rw [PMF.bind_bind]
-  apply bind_skip'
-  intro mb
+  -- simp_rw [PMF.bind_bind]
+  -- apply bind_skip'
+  -- intro mb
   simp [pure]
-
 
 lemma exp_bij : Function.Bijective (fun (z : ZMod params.q) => params.g ^ z.val) := by
   apply (Fintype.bijective_iff_surjective_and_card _).mpr
@@ -340,7 +272,7 @@ lemma G1_G2_lemma3 (m : PMF G) :
   winning Game1 (i.e. guessing the correct bit) is equal to the
   probability of the attacker winning Game2.
 -/
-theorem Game1_Game2 : @Game1 G params = @Game2 G params := by
+theorem Game1_Game2 (A : TwoStageAdversary G G (G × G)) : @Game1 G params A = @Game2 G params A := by
   simp only [Game1, Game2]
   apply bind_skip'
   intro x
@@ -406,7 +338,7 @@ lemma G2_uniform_lemma (b' : ZMod 2) : (PMF.uniformOfFintype (ZMod 2)).bind (fun
   The probability of the attacker (i.e. the composition of A1 and A2)
   winning Game2 (i.e. guessing the correct bit) is equal to a coin flip.
 -/
-theorem Game2_uniform : @Game2 G params = PMF.uniformOfFintype (ZMod 2) := by
+theorem Game2_uniform (A : TwoStageAdversary G G (G × G)) : @Game2 G params A = PMF.uniformOfFintype (ZMod 2) := by
   simp [Game2, bind]
   apply bind_skip_const'
   intro x
@@ -435,9 +367,10 @@ variable (ε : ENNReal)
 -/
 
 
-theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D ε) :
-    @pke_semantic_security' G params ε := by
-  simp only [pke_semantic_security']
+theorem hiding_from_ddh_single_adversary
+    (A : TwoStageAdversary G G (G × G))
+    (DDH_assumption : DDH.Assumption G params.g params.q (D_from_adversary A) ε) :
+    Commitment.comp_hiding_game scheme A 1 - 1/2 ≤ ε := by
   rw [ComputationalHiding_DDH0]
   have h : ((PMF.uniformOfFintype (ZMod 2)) 1) = 1/2 := by
     simp only [PMF.uniformOfFintype_apply, ZMod.card, Nat.cast_ofNat, one_div]
@@ -445,20 +378,8 @@ theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D 
   rw [← @Game2_uniform G params]
   rw [← Game1_Game2]
   rw [Game1_DDH1]
-  exact DDH_G
+  exact le_of_eq_of_le rfl DDH_assumption
 
-
-
-theorem hiding_from_ddh_single_adversary
-    (A : TwoStageAdversary G G (G × G))
-    (DDH_assumption : DDH.Assumption G params.g params.q (D_from_adversary A) ε) :
-    Commitment.comp_hiding_game scheme A 1 - 1/2 ≤ ε := by
-  simp only [Commitment.comp_hiding_game]
-  -- unfold Commitment.comp_hiding_game
-  simp only [PMF.bind_apply, PMF.uniformOfFintype_apply, ZMod.card, Nat.cast_ofNat, tsum_fintype,
-    one_div, tsub_le_iff_right]
-
-  sorry
 
 theorem computational_hiding_from_ddh (ε : ENNReal)
     (DDH_hard : ∀ (D : G → G → G → PMF (ZMod 2)), DDH.Assumption G params.g params.q D ε) :
@@ -466,8 +387,7 @@ theorem computational_hiding_from_ddh (ε : ENNReal)
   unfold Commitment.computational_hiding
   intro hA
   apply hiding_from_ddh_single_adversary
-  sorry
-  -- exact DDH_hard D
+  exact DDH_hard (D_from_adversary hA)
 
 
 end Elgamal
