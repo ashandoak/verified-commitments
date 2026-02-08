@@ -75,20 +75,20 @@ def pke_correctness : Prop := ∀ (m : M), commit_verify setup commit verify m =
   The semantic security game.
   Returns 1 if the attacker A2 guesses the correct bit
 -/
-noncomputable def ComputationalHidingGame : PMF (ZMod 2):=
-do
-  let (h, _) ← setup
-  let ((m, m'), a_state) ← adversary.stage1 h
-  let b ← PMF.uniformOfFintype (ZMod 2)
-  let (c, _) ← commit h (if b = 0 then m else m')
-  let b' ← adversary.stage2 c a_state
-  pure (1 + b + b')
+-- noncomputable def ComputationalHidingGame : PMF (ZMod 2):=
+-- do
+--   let (h, _) ← setup
+--   let ((m, m'), a_state) ← adversary.stage1 h
+--   let b ← PMF.uniformOfFintype (ZMod 2)
+--   let (c, _) ← commit h (if b = 0 then m else m')
+--   let b' ← adversary.stage2 c a_state
+--   pure (1 + b + b')
 
 
 -- SSG(A) denotes the event that A wins the semantic security game
 --local notation `Pr[SSG(A)]` := (SSG keygen encrypt A1 A2 1 : ℝ)
 
-def pke_semantic_security (ε : ENNReal) : Prop :=  (ComputationalHidingGame setup commit adversary 1) - 1/2 ≤ ε
+-- def pke_semantic_security (ε : ENNReal) : Prop :=  (ComputationalHidingGame setup commit adversary 1) - 1/2 ≤ ε
 
 end PKE
 
@@ -131,6 +131,9 @@ noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G :=
   commit := commit,
   verify := verify
 }
+
+def pke_semantic_security' (ε : ENNReal) : Prop := (Commitment.comp_hiding_game scheme params.adversary 1) - 1/2 ≤ ε
+
 
 /-
   -----------------------------------------------------------
@@ -176,8 +179,8 @@ do
   winning the semantic security game (i.e. guessing the correct bit),
   w.r.t. ElGamal is equal to the probability of D winning the game DDH0.
 -/
-theorem ComputationalHiding_DDH0 : PKE.ComputationalHidingGame setup commit params.adversary =  DDH.Game0 G params.g params.q D := by
-  simp only [PKE.ComputationalHidingGame, DDH.Game0, bind, setup, commit, D]
+theorem ComputationalHiding_DDH0 : Commitment.comp_hiding_game scheme params.adversary =  DDH.Game0 G params.g params.q D := by
+  simp only [Commitment.comp_hiding_game, DDH.Game0, bind, scheme, setup, commit, D]
   simp_rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod params.q))]
   apply bind_skip'
   intro x
@@ -422,9 +425,11 @@ variable (ε : ENNReal)
   assumption holds for the group `G`, we conclude `ε` is negligble, and
   therefore ElGamal is, by definition, semantically secure.
 -/
+
+#check pke_semantic_security'
 theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D ε) :
-    PKE.pke_semantic_security setup commit params.adversary ε := by
-  simp only [PKE.pke_semantic_security]
+    @pke_semantic_security' G params ε := by
+  simp only [pke_semantic_security']
   rw [ComputationalHiding_DDH0]
   have h : ((PMF.uniformOfFintype (ZMod 2)) 1) = 1/2 := by
     simp only [PMF.uniformOfFintype_apply, ZMod.card, Nat.cast_ofNat, one_div]
@@ -434,11 +439,18 @@ theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D 
   rw [Game1_DDH1]
   exact DDH_G
 
+-- lemma semantic_security_eq_computational_hiding : ∀ (ε : ENNReal),
+--     PKE.pke_semantic_security setup commit params.adversary ε = Commitment.computational_hiding (@scheme G params) ε := by
+--   intro ε
+--   unfold PKE.pke_semantic_security Commitment.computational_hiding
 
+
+include ε
 
 theorem computational_hiding_from_ddh
-    (DDH_assumption : ∀ (D : G → G → G → PMF (ZMod 2)), ∃ ε, DDH.Assumption G params.g params.q D ε) :
-    ∃ ε, Commitment.computational_hiding (@scheme G params) ε := by
+    (DDH_assumption : ∀ (D : G → G → G → PMF (ZMod 2)), ∃ ε', DDH.Assumption G params.g params.q D ε') :
+    ∃ ε', Commitment.computational_hiding (@scheme G params) ε' := by
+  use ε
 
   sorry
 
