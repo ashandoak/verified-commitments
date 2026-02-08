@@ -132,7 +132,7 @@ noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G :=
   verify := verify
 }
 
-def pke_semantic_security' (ε : ENNReal) : Prop := (Commitment.comp_hiding_game scheme params.adversary 1) - 1/2 ≤ ε
+def pke_semantic_security' (ε : ENNReal) : Prop := (Commitment.comp_hiding_game scheme params.adversary) 1 - 1/2 ≤ ε
 
 
 /-
@@ -173,6 +173,14 @@ do
   let mb ← pure (if b = 0 then m₀ else m₁)
   let b' ← params.adversary.stage2 ⟨gy, (gz * mb)⟩ a_state
   pure (1 + b + b')
+
+noncomputable def D_from_adversary (A : TwoStageAdversary G G (G × G)) : G → G → G → PMF (ZMod 2) :=
+  fun gx gy gz => do
+    let ((m₀, m₁), state) ← A.stage1 gx
+    let b ← PMF.uniformOfFintype (ZMod 2)
+    let mb := if b = 0 then m₀ else m₁
+    let b' ← A.stage2 ⟨gy, gz * mb⟩ state
+    pure (1 + b + b')
 
 /-
   The probability of the attacker (i.e. the composition of A1 and A2)
@@ -426,7 +434,7 @@ variable (ε : ENNReal)
   therefore ElGamal is, by definition, semantically secure.
 -/
 
-#check pke_semantic_security'
+
 theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D ε) :
     @pke_semantic_security' G params ε := by
   simp only [pke_semantic_security']
@@ -439,19 +447,27 @@ theorem elgamal_semantic_security (DDH_G : DDH.Assumption G params.g params.q D 
   rw [Game1_DDH1]
   exact DDH_G
 
--- lemma semantic_security_eq_computational_hiding : ∀ (ε : ENNReal),
---     PKE.pke_semantic_security setup commit params.adversary ε = Commitment.computational_hiding (@scheme G params) ε := by
---   intro ε
---   unfold PKE.pke_semantic_security Commitment.computational_hiding
 
 
-include ε
-
-theorem computational_hiding_from_ddh
-    (DDH_assumption : ∀ (D : G → G → G → PMF (ZMod 2)), ∃ ε', DDH.Assumption G params.g params.q D ε') :
-    ∃ ε', Commitment.computational_hiding (@scheme G params) ε' := by
-  use ε
+theorem hiding_from_ddh_single_adversary
+    (A : TwoStageAdversary G G (G × G))
+    (DDH_assumption : DDH.Assumption G params.g params.q (D_from_adversary A) ε) :
+    Commitment.comp_hiding_game scheme A 1 - 1/2 ≤ ε := by
+  simp only [Commitment.comp_hiding_game]
+  -- unfold Commitment.comp_hiding_game
+  simp only [PMF.bind_apply, PMF.uniformOfFintype_apply, ZMod.card, Nat.cast_ofNat, tsum_fintype,
+    one_div, tsub_le_iff_right]
 
   sorry
+
+theorem computational_hiding_from_ddh (ε : ENNReal)
+    (DDH_hard : ∀ (D : G → G → G → PMF (ZMod 2)), DDH.Assumption G params.g params.q D ε) :
+    Commitment.computational_hiding (@scheme G params) ε := by
+  unfold Commitment.computational_hiding
+  intro hA
+  apply hiding_from_ddh_single_adversary
+  sorry
+  -- exact DDH_hard D
+
 
 end Elgamal
