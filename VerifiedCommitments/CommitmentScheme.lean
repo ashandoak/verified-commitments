@@ -1,6 +1,7 @@
 import Mathlib.Probability.ProbabilityMassFunction.Basic
 import Mathlib.Probability.ProbabilityMassFunction.Monad
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
+import Mathlib.Probability.Distributions.Uniform
 import Mathlib.Data.ZMod.Defs
 
 structure CommitmentScheme (M C O K : Type) where
@@ -15,13 +16,16 @@ structure BindingGuess (M C O : Type) where
   o : O
   o': O
 
+structure TwoStageAdversary (K M C : Type) where
+  State : Type
+  stage1 : K → PMF ((M × M) × State)
+  stage2 : C → State → PMF (ZMod 2)
+
 namespace Commitment
 
 noncomputable section
 variable {M C O K : Type}
 variable (scheme : CommitmentScheme M C O K)
-
-variable (h : K)
 
 def correctness (scheme : CommitmentScheme M C O K) : Prop :=
   ∀ (h : K) (m : M),
@@ -42,9 +46,9 @@ def perfect_binding (scheme : CommitmentScheme M C O K) : Prop :=
 def comp_binding_game (scheme : CommitmentScheme M C O K)
   (A' : K → PMF (BindingGuess M C O)) : PMF $ ZMod 2 :=
   open scoped Classical in
-  PMF.bind scheme.setup (fun h =>
-    PMF.bind (A' h.1) (fun guess =>
-      if scheme.verify h.1 guess.m guess.c guess.o = 1 ∧ scheme.verify h.1 guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m' then pure 1 else pure 0 ))
+  PMF.bind scheme.setup (fun (h, _) =>
+    PMF.bind (A' h) (fun guess =>
+      if scheme.verify h guess.m guess.c guess.o = 1 ∧ scheme.verify h guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m' then pure 1 else pure 0 ))
 
 def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
   ∀ (A' : K → PMF (BindingGuess M C O )), comp_binding_game scheme A' 1 ≤ ε
@@ -52,22 +56,23 @@ def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K) (�
 
 -- Perfect hiding
 def do_commit (scheme: CommitmentScheme M C O K) (m : M) : PMF C :=
-PMF.bind scheme.setup (fun h =>
-  PMF.bind (scheme.commit h.1 m) (fun commit => pure commit.1))
+PMF.bind scheme.setup (fun (h, _) =>
+  PMF.bind (scheme.commit h m) (fun (c, _) => pure c))
 
 def perfect_hiding (scheme: CommitmentScheme M C O K) : Prop :=
   ∀ (m m' : M) (c : C), (do_commit scheme m) c = (do_commit scheme m') c
 
 -- Computational hiding game
-def comp_hiding_game (scheme : CommitmentScheme M C O K)
-  (A : K → C → PMF (ZMod 2)) (m : M) : PMF (ZMod 2) :=
-  PMF.bind scheme.setup (fun h =>
-    PMF.bind (scheme.commit h.1 m) (fun commit => A h.1 commit.1))
+def comp_hiding_game (scheme : CommitmentScheme M C O K) (A : TwoStageAdversary K M C) :=
+  PMF.bind scheme.setup (fun (h, _) =>
+    PMF.bind (A.stage1 h) (fun ((m₀, m₁), state) =>
+      PMF.bind (PMF.uniformOfFintype (ZMod 2)) (fun b =>
+        PMF.bind (scheme.commit h (if b = 0 then m₀ else m₁)) (fun (c, _) =>
+          PMF.bind (A.stage2 c state) (fun b' =>
+            pure (1 + b + b'))))))
 
 def computational_hiding (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
-  ∀ (A : K → C → PMF (ZMod 2)) (m₀ m₁ : M),
-  comp_hiding_game scheme A m₀ 1 - comp_hiding_game scheme A m₁ 1 ≤ ε ||
-  comp_hiding_game scheme A m₁ 1 - comp_hiding_game scheme A m₀ 1 ≤ ε
+  ∀ (A : TwoStageAdversary K M C), comp_hiding_game scheme A 1 - 1/2 ≤ ε
 
 end
 
