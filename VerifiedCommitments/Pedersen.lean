@@ -30,22 +30,6 @@ instance : DecidableEq G := params.decidable_G
 instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
 
 /- ========================================
-   CORE LEMMAS
-   ======================================== -/
-
-lemma ordg_eq_q : orderOf params.g = params.q := by
-  have h_card_zpow : Fintype.card (Subgroup.zpowers params.g) = orderOf params.g := Fintype.card_zpowers
-  have h_card_eq : Fintype.card (Subgroup.zpowers params.g) = Fintype.card G := by
-    have : Function.Bijective (Subtype.val : Subgroup.zpowers params.g → G) := by
-      constructor
-      · exact Subtype.val_injective
-      · intro x
-        use ⟨x, params.gen_G x⟩
-    exact Fintype.card_of_bijective this
-  rw [← h_card_zpow, h_card_eq, params.card_eq]
-
-
-/- ========================================
    SCHEME DEFINITION
    ======================================== -/
 
@@ -68,6 +52,9 @@ noncomputable def scheme :
   commit := commit
     verify := verify
 
+/- ========================================
+   CORRECTNESS
+   ======================================== -/
 
 theorem pedersen_correctness : Commitment.correctness (@scheme G params) := by
   unfold Commitment.correctness
@@ -124,9 +111,6 @@ theorem pedersen_correctness : Commitment.correctness (@scheme G params) := by
     · simp [ENNReal.natCast_ne_top]
   · simp [hb]
 
-
-noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (ZModMult params.q)
-
 /- ========================================
    DLOG EXPERIMENT
    ======================================== -/
@@ -150,6 +134,23 @@ noncomputable def constructDlogAdversary
       PMF.uniformOfFintype (ZMod params.q)
 
 end DLog
+
+/- ========================================
+   CORE LEMMAS AND DEFINITIONS
+   ======================================== -/
+
+lemma ordg_eq_q : orderOf params.g = params.q := by
+  have h_card_zpow : Fintype.card (Subgroup.zpowers params.g) = orderOf params.g := Fintype.card_zpowers
+  have h_card_eq : Fintype.card (Subgroup.zpowers params.g) = Fintype.card G := by
+    have : Function.Bijective (Subtype.val : Subgroup.zpowers params.g → G) := by
+      constructor
+      · exact Subtype.val_injective
+      · intro x
+        use ⟨x, params.gen_G x⟩
+    exact Fintype.card_of_bijective this
+  rw [← h_card_zpow, h_card_eq, params.card_eq]
+
+noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (ZModMult params.q)
 
 /- ========================================
    HIDING PROPERTY
