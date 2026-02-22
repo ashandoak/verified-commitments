@@ -50,7 +50,7 @@ noncomputable def scheme :
     CommitmentScheme (ZMod params.q) G (ZMod params.q) G where
   setup := setup
   commit := commit
-    verify := verify
+  verify := verify
 
 /- ========================================
    CORRECTNESS
@@ -125,12 +125,12 @@ noncomputable def DLogExperiment
       pure <| if params.g^x'.val = params.g^(x).val then 1 else 0
 
 noncomputable def constructDLogAdversary
-      (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q)))
-      (h : G) : PMF (ZMod params.q) :=
+    (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q)))
+    (h : G) : PMF (ZMod params.q) :=
   PMF.bind (A h) fun guess =>
-      if guess.o ≠ guess.o' then
+    if guess.o ≠ guess.o' then
       return (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
-      else
+    else
       PMF.uniformOfFintype (ZMod params.q)
 
 end DLog
@@ -292,7 +292,7 @@ end Hiding
 
 section Binding
 
-lemma binding_implies_dlog
+lemma gpow_eq_of_two_valid_openings
     (a : ZMod params.q)
     (guess : BindingGuess (ZMod params.q) G (ZMod params.q))
     (h₁ :
@@ -339,9 +339,10 @@ lemma binding_implies_dlog
   all_goals contradiction
 
 
-lemma binding_as_hard_dlog
+lemma binding_reduction_to_dlog
     (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))) : -- Pedersen adversary
-    Commitment.comp_binding_game (scheme) A 1 ≤ DLogExperiment (constructDLogAdversary A) 1 := by
+  Commitment.comp_binding_game (scheme) A 1 ≤
+    DLogExperiment (constructDLogAdversary A) 1 := by
   unfold Commitment.comp_binding_game DLogExperiment constructDLogAdversary
 
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
@@ -396,12 +397,12 @@ lemma binding_as_hard_dlog
       exact m_ne m_eq
 
     · -- Case 2: Binding collision (h₁) AND o ≠ o' (¬h₂)
-      -- This is the main case where we use binding_implies_dlog
+      -- This is the main case where we use gpow_eq_of_two_valid_openings
       have h_o_ne : guess.o ≠ guess.o' := h₂
       let x' := (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
 
       have h_dlog : params.g^x'.val = params.g^a.val := by
-        grind only [binding_implies_dlog]
+        grind only [gpow_eq_of_two_valid_openings]
 
       -- The RHS is a sum over a single-element distribution (pure x')
       -- The sum includes the term for x = x', which equals 1
@@ -458,7 +459,7 @@ theorem computational_binding :
     (∀ (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))),
     Commitment.comp_binding_game (@scheme G params) A 1 ≤ ε) := by
   intro ε A' A
-  exact le_trans (binding_as_hard_dlog A) (A' (constructDLogAdversary A))
+  exact le_trans (binding_reduction_to_dlog A) (A' (constructDLogAdversary A))
 
 end Binding
 
