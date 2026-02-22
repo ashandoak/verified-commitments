@@ -124,7 +124,7 @@ noncomputable def DLogExperiment
     (A h).bind fun x' =>
       pure <| if params.g^x'.val = params.g^(x).val then 1 else 0
 
-noncomputable def constructDlogAdversary
+noncomputable def constructDLogAdversary
       (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q)))
       (h : G) : PMF (ZMod params.q) :=
   PMF.bind (A h) fun guess =>
@@ -338,8 +338,8 @@ lemma binding_implies_dlog (a : ZMod params.q) (guess : BindingGuess (ZMod param
 
 lemma binding_as_hard_dlog
     (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))) : -- Pedersen adversary
-    Commitment.comp_binding_game (scheme) A 1 ≤ DLogExperiment (constructDlogAdversary A) 1 := by
-  unfold Commitment.comp_binding_game DLogExperiment constructDlogAdversary
+    Commitment.comp_binding_game (scheme) A 1 ≤ DLogExperiment (constructDLogAdversary A) 1 := by
+  unfold Commitment.comp_binding_game DLogExperiment constructDLogAdversary
 
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
 
