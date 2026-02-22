@@ -292,17 +292,20 @@ end Hiding
 
 section Binding
 
-lemma binding_implies_dlog (a : ZMod params.q) (guess : BindingGuess (ZMod params.q) G (ZMod params.q)) :
-    let h := params.g ^ a.val
-    let verify := fun (m : ZMod params.q) (c : G) (o : ZMod params.q) => if c = params.g^m.val * h^o.val then (1 : ZMod 2) else 0
-    (verify guess.m guess.c guess.o = 1 ∧ verify guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m') →
-    (guess.o ≠ guess.o' → params.g^(((guess.m - guess.m') * (guess.o' - guess.o)⁻¹).val) = h) := by
-  intro h verify ⟨h1, h2, m_ne⟩ o_ne
-  simp only [verify] at h1 h2
-  split at h1 <;> split at h2
+lemma binding_implies_dlog
+    (a : ZMod params.q)
+    (guess : BindingGuess (ZMod params.q) G (ZMod params.q))
+    (h₁ :
+      (if guess.c = params.g ^ guess.m.val * (params.g ^ a.val) ^ guess.o.val
+        then (1 : ZMod 2) else 0) = 1)
+    (h₂ :
+      (if guess.c = params.g ^ guess.m'.val * (params.g ^ a.val) ^ guess.o'.val
+        then (1 : ZMod 2) else 0) = 1)
+    (ho_ne : guess.o ≠ guess.o') :
+    params.g^((guess.m - guess.m') * (guess.o' - guess.o)⁻¹).val =
+      params.g ^ a.val := by
+  split at h₁ <;> split at h₂
   case' isTrue.isTrue c_eq1 c_eq2 =>
-    simp only [h] at c_eq1 c_eq2
-
     have collision : params.g^guess.m.val * (params.g^a.val)^guess.o.val = params.g^guess.m'.val * (params.g^a.val)^guess.o'.val := by
       rw [← c_eq1, c_eq2]
 
@@ -320,7 +323,7 @@ lemma binding_implies_dlog (a : ZMod params.q) (guess : BindingGuess (ZMod param
           have h_mod_zero : (guess.o' - guess.o).val % params.q = 0 := Nat.mod_eq_zero_of_dvd h_dvd
           have h_val_bound : (guess.o' - guess.o).val < params.q := ZMod.val_lt (guess.o' - guess.o)
           exact Nat.eq_zero_of_dvd_of_lt h_dvd h_val_bound
-        exact o_ne.symm (eq_of_sub_eq_zero h_zero)
+        exact ho_ne.symm (eq_of_sub_eq_zero h_zero)
 
     have h_congr_nat : guess.m.val + a.val * guess.o.val ≡ guess.m'.val + a.val * guess.o'.val [MOD params.q] := by
       simpa [ordg_eq_q] using (pow_eq_pow_iff_modEq.mp collision)
@@ -397,13 +400,8 @@ lemma binding_as_hard_dlog
       have h_o_ne : guess.o ≠ guess.o' := h₂
       let x' := (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
 
-      have h₁' : (let h := params.g^a.val;
-                  let verify := fun m c o => if c = params.g^m.val * h^o.val then (1 : ZMod 2) else 0;
-                  verify guess.m guess.c guess.o = 1 ∧ verify guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m') := by
-        grind only
-
       have h_dlog : params.g^x'.val = params.g^a.val := by
-        apply binding_implies_dlog a guess h₁' h_o_ne
+        grind only [binding_implies_dlog]
 
       -- The RHS is a sum over a single-element distribution (pure x')
       -- The sum includes the term for x = x', which equals 1
