@@ -14,7 +14,7 @@ namespace Pedersen
    PUBLIC PARAMETERS
    ======================================== -/
 
-class PedersenScheme (G : Type) extends
+class PublicParameters (G : Type) extends
   Fintype G, Group G, IsCyclic G where
   [decidable_G : DecidableEq G]
   q : ℕ
@@ -25,7 +25,7 @@ class PedersenScheme (G : Type) extends
   gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
 
 -- Make instances available
-variable {G : Type} [params : PedersenScheme G]
+variable {G : Type} [params : PublicParameters G]
 instance : DecidableEq G := params.decidable_G
 instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
 
