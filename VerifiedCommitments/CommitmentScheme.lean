@@ -29,7 +29,7 @@ variable (scheme : CommitmentScheme M C O K)
 
 def correctness (scheme : CommitmentScheme M C O K) : Prop :=
   ∀ (h : K) (m : M),
-  PMF.bind (scheme.commit h m) (fun (commit, opening_val) => pure $ scheme.verify h m commit opening_val) = pure 1
+   (scheme.commit h m).bind (fun (commit, opening_val) => pure <| scheme.verify h m commit opening_val) = pure 1
 
 -- Perfect binding
 def perfect_binding (scheme : CommitmentScheme M C O K) : Prop :=

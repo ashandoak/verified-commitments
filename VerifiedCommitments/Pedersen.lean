@@ -50,20 +50,23 @@ lemma ordg_eq_q : orderOf params.g = params.q := by
    ======================================== -/
 
 noncomputable def setup : PMF (G × (ZMod params.q)) :=
-  PMF.bind (PMF.uniformOfFintype (ZModMult params.q)) (fun a => return ⟨params.g^(val a).val, val a⟩)
+  PMF.uniformOfFintype (ZModMult params.q)|>.bind fun a =>
+    return ⟨params.g^(val a).val, val a⟩
 
-noncomputable def commit (h : G) (m : ZMod params.q) : PMF (G × (ZMod params.q)) :=
-  PMF.bind (PMF.uniformOfFintype (ZMod params.q)) (fun r => return ⟨params.g^m.val * h^r.val, r⟩)
+noncomputable def commit
+    (h : G) (m : ZMod params.q) : PMF (G × (ZMod params.q)) :=
+  PMF.uniformOfFintype (ZMod params.q)|>.bind fun r =>
+    return ⟨params.g^m.val * h^r.val, r⟩
 
-def verify (h : G) (m : ZMod params.q) (c : G) (o : ZMod params.q) : ZMod 2 :=
+def verify
+    (h : G) (m : ZMod params.q) (c : G) (o : ZMod params.q) : ZMod 2 :=
   if c = params.g^m.val * h^o.val then 1 else 0
 
-noncomputable def scheme : CommitmentScheme (ZMod params.q) G (ZMod params.q) G :=
-  {
-    setup := setup,
-    commit := commit,
+noncomputable def scheme :
+    CommitmentScheme (ZMod params.q) G (ZMod params.q) G where
+  setup := setup
+  commit := commit
     verify := verify
-  }
 
 
 theorem pedersen_correctness : Commitment.correctness (@scheme G params) := by
@@ -130,18 +133,21 @@ noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (
 
 section DLog
 
-noncomputable def DLogExperiment (A : G → PMF (ZMod params.q)) : PMF (ZMod 2) :=
-  PMF.bind scheme.setup (fun h =>
-  PMF.bind (A h.1) (fun x' => pure (if params.g^x'.val = params.g^(h.2).val then 1 else 0)))
+noncomputable def DLogExperiment
+    (A : G → PMF (ZMod params.q)) :
+    PMF (ZMod 2) :=
+  scheme.setup.bind fun (h, x) =>
+    (A h).bind fun x' =>
+      pure <| if params.g^x'.val = params.g^(x).val then 1 else 0
 
 noncomputable def constructDlogAdversary
       (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q)))
       (h : G) : PMF (ZMod params.q) :=
-    PMF.bind (A h) (fun guess =>
+  PMF.bind (A h) fun guess =>
       if guess.o ≠ guess.o' then
-        return ((guess.m - guess.m') * (guess.o' - guess.o)⁻¹)
+      return (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
       else
-        PMF.uniformOfFintype (ZMod params.q))
+      PMF.uniformOfFintype (ZMod params.q)
 
 end DLog
 
