@@ -458,7 +458,7 @@ theorem computational_binding :
     (∀ (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))),
     Commitment.comp_binding_game (@scheme G params) A 1 ≤ ε) := by
   intro ε A' A
-  exact le_trans (binding_as_hard_dlog A) (A' (constructDlogAdversary A))
+  exact le_trans (binding_as_hard_dlog A) (A' (constructDLogAdversary A))
 
 end Binding
 
