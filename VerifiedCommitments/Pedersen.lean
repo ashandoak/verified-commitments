@@ -398,7 +398,6 @@ lemma binding_reduction_to_dlog
 
     · -- Case 2: Binding collision (h₁) AND o ≠ o' (¬h₂)
       -- This is the main case where we use gpow_eq_of_two_valid_openings
-      have h_o_ne : guess.o ≠ guess.o' := h₂
       let x' := (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
 
       have h_dlog : params.g^x'.val = params.g^a.val := by
