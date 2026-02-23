@@ -455,8 +455,8 @@ lemma binding_reduction_to_dlog
 theorem computational_binding :
     ∀ (ε : ENNReal),
     (∀ (A' : G → PMF (ZMod params.q)), DLogExperiment A' 1 ≤ ε) →
-    (∀ (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))),
-    Commitment.comp_binding_game (@scheme G params) A 1 ≤ ε) := by
+    ∀ (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))),
+    Commitment.comp_binding_game (@scheme G params) A 1 ≤ ε := by
   intro ε A' A
   exact le_trans (binding_reduction_to_dlog A) (A' (constructDLogAdversary A))
 
