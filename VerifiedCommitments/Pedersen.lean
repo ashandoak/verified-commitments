@@ -158,7 +158,8 @@ noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (
 
 section Hiding
 
-lemma exp_bij (a : ZModMult params.q) (m : ZMod params.q) : Function.Bijective fun (r : ZMod params.q) =>
+lemma exp_bij (a : ZModMult params.q) (m : ZMod params.q) :
+    Function.Bijective fun (r : ZMod params.q) =>
     params.g^((m + (val a) * r : ZMod params.q).val : ℤ) := by
   apply (Fintype.bijective_iff_surjective_and_card _).mpr
   simp [params.card_eq]
@@ -215,29 +216,29 @@ lemma expEquiv_unfold (a : ZModMult params.q) (m r : ZMod params.q) :
   simp
 
 lemma bij_uniform_for_fixed_a (a : ZModMult params.q) (m : ZMod params.q) :
-    PMF.map (expEquiv a m) (PMF.uniformOfFintype (ZMod params.q)) = (PMF.uniformOfFintype G) := by
-  · expose_names;
+    (PMF.uniformOfFintype (ZMod params.q)).map (expEquiv a m) =
+      PMF.uniformOfFintype G := by
     exact map_uniformOfFintype_equiv (expEquiv a m)
 
 lemma bij_uniform_for_uniform_a (m : ZMod params.q) :
-    (PMF.bind (generate_a)
-    (fun a => PMF.map (expEquiv a m) (PMF.uniformOfFintype (ZMod params.q)))) = (PMF.uniformOfFintype G) := by
-  unfold generate_a
+    generate_a.bind (fun a =>
+      (PMF.uniformOfFintype (ZMod params.q)).map (expEquiv a m)) =
+        PMF.uniformOfFintype G := by
   apply bind_skip_const'
   intro a
-  · expose_names; exact bij_uniform_for_fixed_a a m
+  exact bij_uniform_for_fixed_a a m
 
 lemma pedersen_commitment_uniform (m : ZMod params.q) (c : G) :
-    (PMF.map Prod.fst (PMF.bind (generate_a : PMF (ZModMult params.q))
-    (fun a => commit (params.g^(val a).val) m )) c) =
-    ((1 : ENNReal) / (Fintype.card G)) := by
+    (generate_a.bind fun (a : ZModMult params.q) =>
+      commit (params.g^(val a).val) m ).map Prod.fst c =
+        (1 : ENNReal) / Fintype.card G := by
   unfold commit
   simp only [PMF.map_bind, pure, PMF.pure_map]
-  have h_eq : (PMF.bind (generate_a : PMF (ZModMult params.q))
-                (fun a => PMF.bind (PMF.uniformOfFintype (ZMod params.q))
-                  (fun r => PMF.pure (params.g^m.val * (params.g^(val a).val)^r.val)))) =
-              (PMF.bind (generate_a : PMF (ZModMult params.q))
-                (fun a => PMF.map (expEquiv a m) (PMF.uniformOfFintype (ZMod params.q)))) := by
+  have h_eq : generate_a.bind fun (a : ZModMult params.q) =>
+      PMF.uniformOfFintype (ZMod params.q)|>.bind (fun r =>
+        PMF.pure (params.g^m.val * (params.g^(val a).val)^r.val)) =
+          generate_a.bind fun (a : ZModMult params.q) =>
+            PMF.uniformOfFintype (ZMod params.q)|>.map (expEquiv a m) := by
     apply bind_skip'
     intro a
     ext x
