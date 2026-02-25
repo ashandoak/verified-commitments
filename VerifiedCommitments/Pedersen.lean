@@ -232,28 +232,62 @@ lemma pedersen_commitment_uniform (m : ZMod params.q) (c : G) :
     (generate_a.bind fun (a : ZModMult params.q) =>
       commit (params.g^(val a).val) m ).map Prod.fst c =
         (1 : ENNReal) / Fintype.card G := by
-  unfold commit
-  simp only [PMF.map_bind, pure, PMF.pure_map]
-  have h_eq : generate_a.bind fun (a : ZModMult params.q) =>
-      PMF.uniformOfFintype (ZMod params.q)|>.bind (fun r =>
-        PMF.pure (params.g^m.val * (params.g^(val a).val)^r.val)) =
+  have h_eq : (generate_a.bind fun (a : ZModMult params.q) =>
+        commit (params.g^(val a).val) m).map Prod.fst  =
           generate_a.bind fun (a : ZModMult params.q) =>
             PMF.uniformOfFintype (ZMod params.q)|>.map (expEquiv a m) := by
+    unfold commit PMF.map
+    simp only [PMF.bind_bind]
     apply bind_skip'
     intro a
     ext x
-    simp only [PMF.bind_apply, PMF.map_apply, PMF.pure_apply, PMF.uniformOfFintype_apply]
+    simp only [PMF.bind_apply, PMF.uniformOfFintype_apply]
     congr 1; ext r
     by_cases h : x = params.g^m.val * (params.g^(val a).val)^r.val
-    · simp only [h, ↓reduceIte]
+    · simp only [h, ZMod.card, Function.comp_apply, PMF.pure_apply, mul_ite, mul_one, mul_zero, tsum_fintype]
       rw [← expEquiv_unfold a m r]
-      simp
-    · simp only [h, ↓reduceIte]
+      have hs :
+          (∑ a_1 : G × ZMod params.q,
+            if (expEquiv a m) r = a_1.1 then
+              (pure ((expEquiv a m) r, r) :
+                PMF (G × ZMod params.q)) a_1 else 0) = (1 : ENNReal) := by
+        have hs_pure:
+            (∑ a_1 : G × ZMod params.q,
+              if (expEquiv a m) r = a_1.1 then
+                (pure ((expEquiv a m) r, r) :
+                  PMF (G × ZMod params.q)) a_1 else 0) =
+                    ∑ a_1 : G × ZMod params.q, (pure ((expEquiv a m) r, r) :
+                      PMF (G × ZMod params.q)) a_1 := by
+          refine Finset.sum_congr rfl ?_
+          intro y hy
+          by_cases hyEq : y = ((expEquiv a m) r, r)
+          · subst hyEq
+            simp
+          · have hp : (pure ((expEquiv a m) r, r) :
+                PMF (G × ZMod params.q)) y = 0 := by
+              exact PMF.pure_apply_of_ne (a := ((expEquiv a m) r, r)) (a' := y) hyEq
+            by_cases hy1 : (expEquiv a m) r = y.1
+            · simp [hy1]
+            · simp [hy1, hp]
+        have h_pure_one :
+            (∑ a_1 : G × ZMod params.q, (pure ((expEquiv a m) r, r) :
+              PMF (G × ZMod params.q)) a_1) = (1 : ENNReal) := by
+          simpa [tsum_fintype] using (PMF.tsum_coe
+            (pure ((expEquiv a m) r, r) : PMF (G × ZMod params.q)))
+        rw [hs_pure, h_pure_one]
+      simp [hs]
+    · simp only [ZMod.card, Function.comp_apply, PMF.pure_apply, mul_ite, mul_one, mul_zero, tsum_fintype]
       have : x ≠ expEquiv a m r := by
-        intro contra
-        rw [expEquiv_unfold a m r] at contra
-        exact h contra
+        grind only [expEquiv_unfold]
       simp [this]
+      intro a₁ b hx
+      subst hx
+      have hneq :
+          (x, b) ≠ (params.g ^ m.val *
+            (params.g ^ (val a).val) ^ r.val, r) := by grind only
+      exact PMF.pure_apply_of_ne
+        (a := (params.g ^ m.val * (params.g ^ (val a).val) ^ r.val, r))
+          (a' := (x, b)) hneq
   rw [h_eq]
   rw [bij_uniform_for_uniform_a m]
   simp [PMF.uniformOfFintype_apply]
