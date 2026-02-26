@@ -50,7 +50,7 @@ end DDH
 
 namespace Elgamal
 
-class ElgamalParameters (G : Type) extends
+class PublicParameters (G : Type) extends
   Fintype G, Group G, IsCyclic G where
   [decidable_G : DecidableEq G]
   q : ℕ
@@ -63,7 +63,7 @@ class ElgamalParameters (G : Type) extends
   G_card_q : Fintype.card G = q
 
 -- Make instances available
-variable {G : Type} [params : ElgamalParameters G]
+variable {G : Type} [params : PublicParameters G]
 instance : DecidableEq G := params.decidable_G
 instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
 
@@ -80,12 +80,11 @@ do
 def verify (h m : G) (c : (G × G)) (o : ZMod params.q) : ZMod 2 :=
   if c = ⟨params.g^o.val, h^o.val * m⟩ then 1 else 0
 
-noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G :=
-{
-  setup := setup,
-  commit := commit,
+noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G where
+  setup := setup
+  commit := commit
   verify := verify
-}
+
 /-
   -----------------------------------------------------------
   Proof of correctness of ElGamal
@@ -388,6 +387,46 @@ theorem computational_hiding_from_ddh (ε : ENNReal)
   intro hA
   apply hiding_from_ddh_single_adversary
   exact DDH_hard (D_from_adversary hA)
+
+
+/- ========================================
+   BINDING PROPERTY
+   ======================================== -/
+
+lemma ordg_eq_q : orderOf params.g = params.q := by
+  have h_card_zpow : Fintype.card (Subgroup.zpowers params.g) = orderOf params.g := Fintype.card_zpowers
+  have h_card_eq : Fintype.card (Subgroup.zpowers params.g) = Fintype.card G := by
+    have : Function.Bijective (Subtype.val : Subgroup.zpowers params.g → G) := by
+      constructor
+      · exact Subtype.val_injective
+      · intro x
+        use ⟨x, params.g_gen_G x⟩
+    exact Fintype.card_of_bijective this
+  rw [← h_card_zpow, h_card_eq, params.card_eq]
+
+
+theorem perfect_binding : Commitment.perfect_binding (@scheme G params) := by
+  unfold Commitment.perfect_binding
+  intro h c m m' o o'
+  unfold scheme verify
+  simp only [ite_eq_left_iff, zero_ne_one, imp_false, Decidable.not_not]
+  intro hc
+  simp [hc]
+  congr! with hc₁ hc₂
+
+
+  have h_congr : o.val ≡ o'.val [MOD params.q] := by
+      simpa [ordg_eq_q] using (pow_eq_pow_iff_modEq.mp hc₁)
+
+  have o_eq : o = o' := by
+    have eq_cast : ((o.val : ℕ) : ZMod params.q) = ((o'.val : ℕ) : ZMod params.q) :=
+      ZMod.natCast_eq_natCast_iff o.val o'.val params.q |>.mpr h_congr
+    simp at eq_cast
+    exact eq_cast
+
+  subst o_eq
+  simp at hc₂
+  exact hc₂
 
 
 end Elgamal
