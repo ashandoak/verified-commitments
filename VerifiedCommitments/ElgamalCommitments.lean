@@ -50,7 +50,7 @@ end DDH
 
 namespace Elgamal
 
-class ElgamalParameters (G : Type) extends
+class PublicParameters (G : Type) extends
   Fintype G, Group G, IsCyclic G where
   [decidable_G : DecidableEq G]
   q : ℕ
@@ -63,7 +63,7 @@ class ElgamalParameters (G : Type) extends
   G_card_q : Fintype.card G = q
 
 -- Make instances available
-variable {G : Type} [params : ElgamalParameters G]
+variable {G : Type} [params : PublicParameters G]
 instance : DecidableEq G := params.decidable_G
 instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
 
@@ -80,12 +80,11 @@ do
 def verify (h m : G) (c : (G × G)) (o : ZMod params.q) : ZMod 2 :=
   if c = ⟨params.g^o.val, h^o.val * m⟩ then 1 else 0
 
-noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G :=
-{
-  setup := setup,
-  commit := commit,
+noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G where
+  setup := setup
+  commit := commit
   verify := verify
-}
+
 /-
   -----------------------------------------------------------
   Proof of correctness of ElGamal
