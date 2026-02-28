@@ -45,14 +45,14 @@ def correctness (scheme : CommitmentScheme M C O K) : Prop :=
   ∀ (h : K) (m : M), (scheme.commit h m).bind (fun (c, o) =>
     pure <| scheme.verify h m c o) = pure 1
 
-/-- A commitment scheme is perfectly binding if for any public parameters `h`, any commits `c`, and any messages `m m'` and any opening values `o o'` if `verify h m c o = verify h m' c o'` then `m = m'`.-/
+/-- A commitment scheme with public parameter `h` is perfectly binding if no commitment `c` can be opened to two different messages. For two purported openings `(m,o)` and `(m',o')` both verifying for the same `c`, the messages must be equal (`m = m'`). -/
 def perfect_binding (scheme : CommitmentScheme M C O K) : Prop :=
   ∀ (h : K) (c : C) (m m' : M) (o o' : O),
     scheme.verify h m c o = 1 →
       scheme.verify h m' c o' = 1 →
         m = m'
 
-/-- A commitment scheme is perfectly hiding if for any messages `m m'` and any commitment `c`, the distributions on commitments induced by first running `setup` and then running `commit` on `m` or `m'` are identical. -/
+/-- A commitment scheme is perfectly hiding if for any messages `m` and `m'`, the induced distribution on commitments is the same. Sampling `h ← setup` and then committing to `m` or `m'` under `h` yields identical commitment distributions. -/
 def perfect_hiding (scheme: CommitmentScheme M C O K) : Prop :=
   ∀ (m m' : M) (c : C),
     PMF.bind scheme.setup (fun (h, _) =>
