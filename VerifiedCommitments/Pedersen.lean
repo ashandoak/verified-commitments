@@ -295,7 +295,7 @@ lemma pedersen_commitment_uniform (m : ZMod params.q) (c : G) :
 theorem perfect_hiding : Commitment.perfect_hiding (@scheme G params) := by
   unfold Commitment.perfect_hiding
   intros m m' c
-  unfold Commitment.do_commit Pedersen.scheme
+  unfold Pedersen.scheme
   simp only []
   unfold Pedersen.setup Pedersen.commit
   simp only [PMF.bind_bind]
@@ -318,6 +318,7 @@ theorem perfect_hiding : Commitment.perfect_hiding (@scheme G params) := by
     unfold generate_a Pedersen.commit
     simp only [PMF.map_bind, pure, PMF.pure_map]
   rw [h_lhs, h_rhs]
+
 
 end Hiding
 
@@ -382,7 +383,7 @@ lemma binding_reduction_to_dlog
 
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
 
-  rw [PMF.bind_apply, PMF.bind_apply]
+  rw [PMF.bind_apply ]
   apply ENNReal.tsum_le_tsum
   intro ⟨h, a⟩
 
@@ -394,7 +395,7 @@ lemma binding_reduction_to_dlog
     conv_rhs => rw [PMF.bind_bind]
 
     -- Same structure as above
-    rw [PMF.bind_apply, PMF.bind_apply]
+    rw [PMF.bind_apply ]
     apply ENNReal.tsum_le_tsum
     intro guess
 
@@ -402,7 +403,6 @@ lemma binding_reduction_to_dlog
 
     simp only [ite_eq_left_iff, zero_ne_one, imp_false, Decidable.not_not, ne_eq, ite_not,
       PMF.bind_apply, tsum_fintype]
-    rw [@DFunLike.ite_apply]
     split_ifs with h₁ h₂
 
     · -- Case 1: h₁ binding collision AND h₂ (o = o')
