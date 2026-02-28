@@ -34,11 +34,9 @@ structure TwoStageAdversary (K M C : Type) where
   stage1 : K → PMF ((M × M) × state)
   stage2 : C → state → PMF (ZMod 2)
 
-noncomputable section
+namespace Commitment
 
 variable {M C O K : Type}
-
-namespace Commitment
 
 /-- For any public parameters `h` and any message `m` if `commit` outputs a commitment `c` and opening value `o`, then `verify h m c o` accepts with probability 1.-/
 def correctness (scheme : CommitmentScheme M C O K) : Prop :=
@@ -62,6 +60,8 @@ def perfect_hiding (scheme: CommitmentScheme M C O K) : Prop :=
     PMF.bind scheme.setup (fun (h, _) =>
       PMF.bind (scheme.commit h m') (fun (c, _) =>
         pure c)) c
+
+noncomputable section
 
 /- Computational Binding -/
 
@@ -100,6 +100,6 @@ over random guessing in the hiding game is at most `ε`. -/
 def computational_hiding (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
   ∀ (A : TwoStageAdversary K M C), comp_hiding_game scheme A 1 - 1/2 ≤ ε
 
-end Commitment
-
 end
+
+end Commitment
