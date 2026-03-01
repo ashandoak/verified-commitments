@@ -49,7 +49,8 @@ noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G where
    CORRECTNESS
    ======================================== -/
 
-theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G params) := by
+theorem elgamal_commitment_correctness :
+    Commitment.correctness (@scheme G params) := by
   intro h m
   show PMF.bind (scheme.commit h m) _ = _
   simp only [scheme]
