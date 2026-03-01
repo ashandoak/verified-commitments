@@ -40,7 +40,7 @@ variable {M C O K : Type}
 
 /-- For any public parameters `h` and any message `m` if `commit` outputs a commitment `c` and opening value `o`, then `verify h m c o` accepts with probability 1.-/
 def correctness (scheme : CommitmentScheme M C O K) : Prop :=
-  ∀ (h : K) (m : M), (scheme.commit h m).bind (fun (c, o) =>
+  ∀ (h : K) (m : M), (scheme.commit h m |>.bind fun (c, o) =>
     pure <| scheme.verify h m c o) = pure 1
 
 /-- A commitment scheme with public parameter `h` is perfectly binding if no commitment `c` can be opened to two different messages. For two purported openings `(m,o)` and `(m',o')` both verifying for the same `c`, the messages must be equal (`m = m'`). -/
@@ -61,12 +61,11 @@ def perfect_hiding (scheme: CommitmentScheme M C O K) : Prop :=
       PMF.bind (scheme.commit h m') (fun (c, _) =>
         pure c)) c
 
-noncomputable section
-
 /- Computational Binding -/
 
 /-- For any adversary `A` that accepts `h ← setup` and outputs a single commitment `c` together with two purported openings `(m,o)` and `(m',o')`, the computational binding game outputs `1` if `c` opens to both `(m,o)` and `(m',o') and the messages differ (`m ≠ m'`). -/
-def comp_binding_game [DecidableEq M] (scheme : CommitmentScheme M C O K)
+noncomputable def comp_binding_game
+    [DecidableEq M] (scheme : CommitmentScheme M C O K)
     (A : K → PMF (BindingGuess M C O)) : PMF (ZMod 2) := do
   let (h, _) ← scheme.setup
   let guess ← A h
@@ -81,11 +80,10 @@ def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K)
     (ε : ENNReal) : Prop :=
   ∀ (A' : K → PMF (BindingGuess M C O )), comp_binding_game scheme A' 1 ≤ ε
 
-
 /- Computational Hiding -/
 
 /-- For any `TwoStageAdversary` `A`, sample `h ← setup` and give `h` to the adversary’s first stage to produce two challenge messages `m₀, m₁. The computational hiding game samples a uniform bit `b`, computes a commitment to `m_b`, and gives the commitment `c` to the adversary’s second stage. The game outputs a bit indicating whether the adversary’s guess matches `b`. -/
-def comp_hiding_game
+noncomputable def comp_hiding_game
     (scheme : CommitmentScheme M C O K)
     (A : TwoStageAdversary K M C) := do
   let (h, _) ← scheme.setup
@@ -99,7 +97,5 @@ def comp_hiding_game
 over random guessing in the hiding game is at most `ε`. -/
 def computational_hiding (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
   ∀ (A : TwoStageAdversary K M C), comp_hiding_game scheme A 1 - 1/2 ≤ ε
-
-end
 
 end Commitment
