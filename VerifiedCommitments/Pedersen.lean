@@ -14,7 +14,7 @@ namespace Pedersen
    PUBLIC PARAMETERS
    ======================================== -/
 
-class PedersenScheme (G : Type) extends
+class PublicParameters (G : Type) extends
   Fintype G, Group G, IsCyclic G where
   [decidable_G : DecidableEq G]
   q : ℕ
@@ -25,46 +25,36 @@ class PedersenScheme (G : Type) extends
   gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
 
 -- Make instances available
-variable {G : Type} [params : PedersenScheme G]
+variable {G : Type} [params : PublicParameters G]
 instance : DecidableEq G := params.decidable_G
 instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
-
-/- ========================================
-   CORE LEMMAS
-   ======================================== -/
-
-lemma ordg_eq_q : orderOf params.g = params.q := by
-  have h_card_zpow : Fintype.card (Subgroup.zpowers params.g) = orderOf params.g := Fintype.card_zpowers
-  have h_card_eq : Fintype.card (Subgroup.zpowers params.g) = Fintype.card G := by
-    have : Function.Bijective (Subtype.val : Subgroup.zpowers params.g → G) := by
-      constructor
-      · exact Subtype.val_injective
-      · intro x
-        use ⟨x, params.gen_G x⟩
-    exact Fintype.card_of_bijective this
-  rw [← h_card_zpow, h_card_eq, params.card_eq]
-
 
 /- ========================================
    SCHEME DEFINITION
    ======================================== -/
 
 noncomputable def setup : PMF (G × (ZMod params.q)) :=
-  PMF.bind (PMF.uniformOfFintype (ZModMult params.q)) (fun a => return ⟨params.g^(val a).val, val a⟩)
+  PMF.uniformOfFintype (ZModMult params.q)|>.bind fun a =>
+    return ⟨params.g^(val a).val, val a⟩
 
-noncomputable def commit (h : G) (m : ZMod params.q) : PMF (G × (ZMod params.q)) :=
-  PMF.bind (PMF.uniformOfFintype (ZMod params.q)) (fun r => return ⟨params.g^m.val * h^r.val, r⟩)
+noncomputable def commit
+    (h : G) (m : ZMod params.q) : PMF (G × (ZMod params.q)) :=
+  PMF.uniformOfFintype (ZMod params.q)|>.bind fun r =>
+    return ⟨params.g^m.val * h^r.val, r⟩
 
-def verify (h : G) (m : ZMod params.q) (c : G) (o : ZMod params.q) : ZMod 2 :=
+def verify
+    (h : G) (m : ZMod params.q) (c : G) (o : ZMod params.q) : ZMod 2 :=
   if c = params.g^m.val * h^o.val then 1 else 0
 
-noncomputable def scheme : CommitmentScheme (ZMod params.q) G (ZMod params.q) G :=
-  {
-    setup := setup,
-    commit := commit,
-    verify := verify
-  }
+noncomputable def scheme :
+    CommitmentScheme (ZMod params.q) G (ZMod params.q) G where
+  setup := setup
+  commit := commit
+  verify := verify
 
+/- ========================================
+   CORRECTNESS
+   ======================================== -/
 
 theorem pedersen_correctness : Commitment.correctness (@scheme G params) := by
   unfold Commitment.correctness
@@ -121,29 +111,46 @@ theorem pedersen_correctness : Commitment.correctness (@scheme G params) := by
     · simp [ENNReal.natCast_ne_top]
   · simp [hb]
 
-
-noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (ZModMult params.q)
-
 /- ========================================
    DLOG EXPERIMENT
    ======================================== -/
 
 section DLog
 
-noncomputable def DLogExperiment (A : G → PMF (ZMod params.q)) : PMF (ZMod 2) :=
-  PMF.bind scheme.setup (fun h =>
-  PMF.bind (A h.1) (fun x' => pure (if params.g^x'.val = params.g^(h.2).val then 1 else 0)))
+noncomputable def DLogExperiment
+    (A : G → PMF (ZMod params.q)) :
+    PMF (ZMod 2) :=
+  scheme.setup.bind fun (h, x) =>
+    (A h).bind fun x' =>
+      pure <| if params.g^x'.val = params.g^(x).val then 1 else 0
 
-noncomputable def constructDlogAdversary
-      (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q)))
-      (h : G) : PMF (ZMod params.q) :=
-    PMF.bind (A h) (fun guess =>
-      if guess.o ≠ guess.o' then
-        return ((guess.m - guess.m') * (guess.o' - guess.o)⁻¹)
-      else
-        PMF.uniformOfFintype (ZMod params.q))
+noncomputable def constructDLogAdversary
+    (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q)))
+    (h : G) : PMF (ZMod params.q) :=
+  PMF.bind (A h) fun guess =>
+    if guess.o ≠ guess.o' then
+      return (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
+    else
+      PMF.uniformOfFintype (ZMod params.q)
 
 end DLog
+
+/- ========================================
+   CORE LEMMAS AND DEFINITIONS
+   ======================================== -/
+
+lemma ordg_eq_q : orderOf params.g = params.q := by
+  have h_card_zpow : Fintype.card (Subgroup.zpowers params.g) = orderOf params.g := Fintype.card_zpowers
+  have h_card_eq : Fintype.card (Subgroup.zpowers params.g) = Fintype.card G := by
+    have : Function.Bijective (Subtype.val : Subgroup.zpowers params.g → G) := by
+      constructor
+      · exact Subtype.val_injective
+      · intro x
+        use ⟨x, params.gen_G x⟩
+    exact Fintype.card_of_bijective this
+  rw [← h_card_zpow, h_card_eq, params.card_eq]
+
+noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (ZModMult params.q)
 
 /- ========================================
    HIDING PROPERTY
@@ -151,7 +158,8 @@ end DLog
 
 section Hiding
 
-lemma exp_bij (a : ZModMult params.q) (m : ZMod params.q) : Function.Bijective fun (r : ZMod params.q) =>
+lemma exp_bij (a : ZModMult params.q) (m : ZMod params.q) :
+    Function.Bijective fun (r : ZMod params.q) =>
     params.g^((m + (val a) * r : ZMod params.q).val : ℤ) := by
   apply (Fintype.bijective_iff_surjective_and_card _).mpr
   simp [params.card_eq]
@@ -208,44 +216,78 @@ lemma expEquiv_unfold (a : ZModMult params.q) (m r : ZMod params.q) :
   simp
 
 lemma bij_uniform_for_fixed_a (a : ZModMult params.q) (m : ZMod params.q) :
-    PMF.map (expEquiv a m) (PMF.uniformOfFintype (ZMod params.q)) = (PMF.uniformOfFintype G) := by
-  · expose_names;
+    (PMF.uniformOfFintype (ZMod params.q)).map (expEquiv a m) =
+      PMF.uniformOfFintype G := by
     exact map_uniformOfFintype_equiv (expEquiv a m)
 
 lemma bij_uniform_for_uniform_a (m : ZMod params.q) :
-    (PMF.bind (generate_a)
-    (fun a => PMF.map (expEquiv a m) (PMF.uniformOfFintype (ZMod params.q)))) = (PMF.uniformOfFintype G) := by
-  unfold generate_a
+    generate_a.bind (fun a =>
+      (PMF.uniformOfFintype (ZMod params.q)).map (expEquiv a m)) =
+        PMF.uniformOfFintype G := by
   apply bind_skip_const'
   intro a
-  · expose_names; exact bij_uniform_for_fixed_a a m
+  exact bij_uniform_for_fixed_a a m
 
 lemma pedersen_commitment_uniform (m : ZMod params.q) (c : G) :
-    (PMF.map Prod.fst (PMF.bind (generate_a : PMF (ZModMult params.q))
-    (fun a => commit (params.g^(val a).val) m )) c) =
-    ((1 : ENNReal) / (Fintype.card G)) := by
-  unfold commit
-  simp only [PMF.map_bind, pure, PMF.pure_map]
-  have h_eq : (PMF.bind (generate_a : PMF (ZModMult params.q))
-                (fun a => PMF.bind (PMF.uniformOfFintype (ZMod params.q))
-                  (fun r => PMF.pure (params.g^m.val * (params.g^(val a).val)^r.val)))) =
-              (PMF.bind (generate_a : PMF (ZModMult params.q))
-                (fun a => PMF.map (expEquiv a m) (PMF.uniformOfFintype (ZMod params.q)))) := by
+    (generate_a.bind fun (a : ZModMult params.q) =>
+      commit (params.g^(val a).val) m ).map Prod.fst c =
+        (1 : ENNReal) / Fintype.card G := by
+  have h_eq : (generate_a.bind fun (a : ZModMult params.q) =>
+        commit (params.g^(val a).val) m).map Prod.fst  =
+          generate_a.bind fun (a : ZModMult params.q) =>
+            PMF.uniformOfFintype (ZMod params.q)|>.map (expEquiv a m) := by
+    unfold commit PMF.map
+    simp only [PMF.bind_bind]
     apply bind_skip'
     intro a
     ext x
-    simp only [PMF.bind_apply, PMF.map_apply, PMF.pure_apply, PMF.uniformOfFintype_apply]
+    simp only [PMF.bind_apply, PMF.uniformOfFintype_apply]
     congr 1; ext r
     by_cases h : x = params.g^m.val * (params.g^(val a).val)^r.val
-    · simp only [h, ↓reduceIte]
+    · simp only [h, ZMod.card, Function.comp_apply, PMF.pure_apply, mul_ite, mul_one, mul_zero, tsum_fintype]
       rw [← expEquiv_unfold a m r]
-      simp
-    · simp only [h, ↓reduceIte]
+      have hs :
+          (∑ a_1 : G × ZMod params.q,
+            if (expEquiv a m) r = a_1.1 then
+              (pure ((expEquiv a m) r, r) :
+                PMF (G × ZMod params.q)) a_1 else 0) = (1 : ENNReal) := by
+        have hs_pure:
+            (∑ a_1 : G × ZMod params.q,
+              if (expEquiv a m) r = a_1.1 then
+                (pure ((expEquiv a m) r, r) :
+                  PMF (G × ZMod params.q)) a_1 else 0) =
+                    ∑ a_1 : G × ZMod params.q, (pure ((expEquiv a m) r, r) :
+                      PMF (G × ZMod params.q)) a_1 := by
+          refine Finset.sum_congr rfl ?_
+          intro y hy
+          by_cases hyEq : y = ((expEquiv a m) r, r)
+          · subst hyEq
+            simp
+          · have hp : (pure ((expEquiv a m) r, r) :
+                PMF (G × ZMod params.q)) y = 0 := by
+              exact PMF.pure_apply_of_ne (a := ((expEquiv a m) r, r)) (a' := y) hyEq
+            by_cases hy1 : (expEquiv a m) r = y.1
+            · simp [hy1]
+            · simp [hy1, hp]
+        have h_pure_one :
+            (∑ a_1 : G × ZMod params.q, (pure ((expEquiv a m) r, r) :
+              PMF (G × ZMod params.q)) a_1) = (1 : ENNReal) := by
+          simpa [tsum_fintype] using (PMF.tsum_coe
+            (pure ((expEquiv a m) r, r) : PMF (G × ZMod params.q)))
+        rw [hs_pure, h_pure_one]
+      simp [hs]
+    · simp only [ZMod.card, Function.comp_apply, PMF.pure_apply, mul_ite, mul_one, mul_zero, tsum_fintype]
       have : x ≠ expEquiv a m r := by
-        intro contra
-        rw [expEquiv_unfold a m r] at contra
-        exact h contra
+        grind only [expEquiv_unfold]
       simp [this]
+      intro a₁ b hx
+      subst hx
+      have hneq :
+          (x, b) ≠ (params.g ^ m.val *
+            (params.g ^ (val a).val) ^ r.val, r) := by grind only
+      exact PMF.pure_apply_of_ne
+        (a := (params.g ^ m.val * (params.g ^ (val a).val) ^ r.val, r))
+          (a' := (x, b)) hneq
   rw [h_eq]
   rw [bij_uniform_for_uniform_a m]
   simp [PMF.uniformOfFintype_apply]
@@ -253,7 +295,7 @@ lemma pedersen_commitment_uniform (m : ZMod params.q) (c : G) :
 theorem perfect_hiding : Commitment.perfect_hiding (@scheme G params) := by
   unfold Commitment.perfect_hiding
   intros m m' c
-  unfold Commitment.do_commit Pedersen.scheme
+  unfold Pedersen.scheme
   simp only []
   unfold Pedersen.setup Pedersen.commit
   simp only [PMF.bind_bind]
@@ -277,6 +319,7 @@ theorem perfect_hiding : Commitment.perfect_hiding (@scheme G params) := by
     simp only [PMF.map_bind, pure, PMF.pure_map]
   rw [h_lhs, h_rhs]
 
+
 end Hiding
 
 /- ========================================
@@ -285,17 +328,20 @@ end Hiding
 
 section Binding
 
-lemma binding_implies_dlog (a : ZMod params.q) (guess : BindingGuess (ZMod params.q) G (ZMod params.q)) :
-    let h := params.g ^ a.val
-    let verify := fun (m : ZMod params.q) (c : G) (o : ZMod params.q) => if c = params.g^m.val * h^o.val then (1 : ZMod 2) else 0
-    (verify guess.m guess.c guess.o = 1 ∧ verify guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m') →
-    (guess.o ≠ guess.o' → params.g^(((guess.m - guess.m') * (guess.o' - guess.o)⁻¹).val) = h) := by
-  intro h verify ⟨h1, h2, m_ne⟩ o_ne
-  simp only [verify] at h1 h2
-  split at h1 <;> split at h2
+lemma gpow_eq_of_two_valid_openings
+    (a : ZMod params.q)
+    (guess : BindingGuess (ZMod params.q) G (ZMod params.q))
+    (h₁ :
+      (if guess.c = params.g ^ guess.m.val * (params.g ^ a.val) ^ guess.o.val
+        then (1 : ZMod 2) else 0) = 1)
+    (h₂ :
+      (if guess.c = params.g ^ guess.m'.val * (params.g ^ a.val) ^ guess.o'.val
+        then (1 : ZMod 2) else 0) = 1)
+    (ho_ne : guess.o ≠ guess.o') :
+    params.g^((guess.m - guess.m') * (guess.o' - guess.o)⁻¹).val =
+      params.g ^ a.val := by
+  split at h₁ <;> split at h₂
   case' isTrue.isTrue c_eq1 c_eq2 =>
-    simp only [h] at c_eq1 c_eq2
-
     have collision : params.g^guess.m.val * (params.g^a.val)^guess.o.val = params.g^guess.m'.val * (params.g^a.val)^guess.o'.val := by
       rw [← c_eq1, c_eq2]
 
@@ -313,7 +359,7 @@ lemma binding_implies_dlog (a : ZMod params.q) (guess : BindingGuess (ZMod param
           have h_mod_zero : (guess.o' - guess.o).val % params.q = 0 := Nat.mod_eq_zero_of_dvd h_dvd
           have h_val_bound : (guess.o' - guess.o).val < params.q := ZMod.val_lt (guess.o' - guess.o)
           exact Nat.eq_zero_of_dvd_of_lt h_dvd h_val_bound
-        exact o_ne.symm (eq_of_sub_eq_zero h_zero)
+        exact ho_ne.symm (eq_of_sub_eq_zero h_zero)
 
     have h_congr_nat : guess.m.val + a.val * guess.o.val ≡ guess.m'.val + a.val * guess.o'.val [MOD params.q] := by
       simpa [ordg_eq_q] using (pow_eq_pow_iff_modEq.mp collision)
@@ -329,14 +375,15 @@ lemma binding_implies_dlog (a : ZMod params.q) (guess : BindingGuess (ZMod param
   all_goals contradiction
 
 
-lemma binding_as_hard_dlog
+lemma binding_reduction_to_dlog
     (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))) : -- Pedersen adversary
-    Commitment.comp_binding_game (scheme) A 1 ≤ DLogExperiment (constructDlogAdversary A) 1 := by
-  unfold Commitment.comp_binding_game DLogExperiment constructDlogAdversary
+  Commitment.comp_binding_game (scheme) A 1 ≤
+    DLogExperiment (constructDLogAdversary A) 1 := by
+  unfold Commitment.comp_binding_game DLogExperiment constructDLogAdversary
 
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
 
-  rw [PMF.bind_apply, PMF.bind_apply]
+  rw [PMF.bind_apply ]
   apply ENNReal.tsum_le_tsum
   intro ⟨h, a⟩
 
@@ -348,7 +395,7 @@ lemma binding_as_hard_dlog
     conv_rhs => rw [PMF.bind_bind]
 
     -- Same structure as above
-    rw [PMF.bind_apply, PMF.bind_apply]
+    rw [PMF.bind_apply ]
     apply ENNReal.tsum_le_tsum
     intro guess
 
@@ -356,7 +403,6 @@ lemma binding_as_hard_dlog
 
     simp only [ite_eq_left_iff, zero_ne_one, imp_false, Decidable.not_not, ne_eq, ite_not,
       PMF.bind_apply, tsum_fintype]
-    rw [@DFunLike.ite_apply]
     split_ifs with h₁ h₂
 
     · -- Case 1: h₁ binding collision AND h₂ (o = o')
@@ -386,17 +432,11 @@ lemma binding_as_hard_dlog
       exact m_ne m_eq
 
     · -- Case 2: Binding collision (h₁) AND o ≠ o' (¬h₂)
-      -- This is the main case where we use binding_implies_dlog
-      have h_o_ne : guess.o ≠ guess.o' := h₂
+      -- This is the main case where we use gpow_eq_of_two_valid_openings
       let x' := (guess.m - guess.m') * (guess.o' - guess.o)⁻¹
 
-      have h₁' : (let h := params.g^a.val;
-                  let verify := fun m c o => if c = params.g^m.val * h^o.val then (1 : ZMod 2) else 0;
-                  verify guess.m guess.c guess.o = 1 ∧ verify guess.m' guess.c guess.o' = 1 ∧ guess.m ≠ guess.m') := by
-        grind only
-
       have h_dlog : params.g^x'.val = params.g^a.val := by
-        apply binding_implies_dlog a guess h₁' h_o_ne
+        grind only [gpow_eq_of_two_valid_openings]
 
       -- The RHS is a sum over a single-element distribution (pure x')
       -- The sum includes the term for x = x', which equals 1
@@ -450,10 +490,10 @@ lemma binding_as_hard_dlog
 theorem computational_binding :
     ∀ (ε : ENNReal),
     (∀ (A' : G → PMF (ZMod params.q)), DLogExperiment A' 1 ≤ ε) →
-    (∀ (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))),
-    Commitment.comp_binding_game (@scheme G params) A 1 ≤ ε) := by
+    ∀ (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))),
+    Commitment.comp_binding_game (@scheme G params) A 1 ≤ ε := by
   intro ε A' A
-  exact le_trans (binding_as_hard_dlog A) (A' (constructDlogAdversary A))
+  exact le_trans (binding_reduction_to_dlog A) (A' (constructDLogAdversary A))
 
 end Binding
 

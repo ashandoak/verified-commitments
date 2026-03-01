@@ -1,52 +1,12 @@
 -- From cryptolib licensed under Apache 2.0
 -- https://github.com/joeylupo/cryptolib
 
-/-
- -----------------------------------------------------------
-  Correctness and semantic security of ElGamal public-key
-  encryption scheme
- -----------------------------------------------------------
--/
-
-import Mathlib
 import VerifiedCommitments.cryptolib
 import VerifiedCommitments.CommitmentScheme
 
-namespace DDH
-
-variable (G : Type) [Fintype G] [Group G]
-          (g : G) (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g)
-          (q : ℕ) [NeZero q] [Fact (0 < q)] (G_card_q : Fintype.card G = q)
-          (D : G → G → G → PMF (ZMod 2))
-
-include g_gen_G G_card_q
-
-instance : Fintype (ZMod q) := ZMod.fintype q
-
-noncomputable def Game0 : PMF (ZMod 2) :=
-do
-  let x ← PMF.uniformOfFintype (ZMod q)
-  let y ← PMF.uniformOfFintype (ZMod q)
-  let b ← D (g^x.val) (g^y.val) (g^(x.val * y.val))
-  pure b
-
-noncomputable def Game1 : PMF (ZMod 2) :=
-do
-  let x ← PMF.uniformOfFintype (ZMod q)
-  let y ← PMF.uniformOfFintype (ZMod q)
-  let z ← PMF.uniformOfFintype (ZMod q)
-  let b ← D (g^x.val) (g^y.val) (g^z.val)
-  pure b
-
--- DDH0(D) is the event that D outputs 1 upon receiving (g^x, g^y, g^(xy))
--- local notation `Pr[DDH0(D)]` := (DDH0 G g g_gen_G q G_card_q D 1 : ℝ)
-
--- DDH1(D) is the event that D outputs 1 upon receiving (g^x, g^y, g^z)
--- local notation `Pr[DDH1(D)]` := (DDH1 G g g_gen_G q G_card_q D 1 : ℝ)
-
-def Assumption (ε : ENNReal) : Prop := (Game0 G g q D 1) - (Game1 G g q D 1) ≤ ε
-
-end DDH
+/- ========================================
+   PUBLIC PARAMETERS
+   ======================================== -/
 
 namespace Elgamal
 
@@ -67,7 +27,11 @@ variable {G : Type} [params : PublicParameters G]
 instance : DecidableEq G := params.decidable_G
 instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
 
-noncomputable def setup : PMF (G × ZMod params.q) := -- Need to include x to match CommitmentScheme spec
+/- ========================================
+   SCHEME DEFINITION
+   ======================================== -/
+
+noncomputable def setup : PMF (G × ZMod params.q) :=
 do
   let x ← PMF.uniformOfFintype (ZMod params.q)
   return (params.g^x.val, x)
@@ -85,11 +49,9 @@ noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G where
   commit := commit
   verify := verify
 
-/-
-  -----------------------------------------------------------
-  Proof of correctness of ElGamal
-  -----------------------------------------------------------
--/
+/- ========================================
+   CORRECTNESS
+   ======================================== -/
 
 theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G params) := by
   intro h m
@@ -98,6 +60,37 @@ theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G param
   unfold commit verify
   simp only [bind_pure_comp, Functor.map, PMF.bind_bind, Function.comp_apply, PMF.pure_bind, ↓reduceIte, PMF.bind_const]
 
+/- ========================================
+   DDH EXPERIMENT
+   ======================================== -/
+
+namespace DDH
+
+variable (G : Type) [Fintype G] [Group G]
+          (g : G) (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g)
+          (q : ℕ) [NeZero q] [Fact (0 < q)] (G_card_q : Fintype.card G = q)
+          (D : G → G → G → PMF (ZMod 2))
+
+include g_gen_G G_card_q
+
+noncomputable def Game0 : PMF (ZMod 2) :=
+do
+  let x ← PMF.uniformOfFintype (ZMod q)
+  let y ← PMF.uniformOfFintype (ZMod q)
+  let b ← D (g^x.val) (g^y.val) (g^(x.val * y.val))
+  pure b
+
+noncomputable def Game1 : PMF (ZMod 2) :=
+do
+  let x ← PMF.uniformOfFintype (ZMod q)
+  let y ← PMF.uniformOfFintype (ZMod q)
+  let z ← PMF.uniformOfFintype (ZMod q)
+  let b ← D (g^x.val) (g^y.val) (g^z.val)
+  pure b
+
+def Assumption (ε : ENNReal) : Prop := (Game0 G g q D 1) - (Game1 G g q D 1) ≤ ε
+
+end DDH
 
 /-
   -----------------------------------------------------------
