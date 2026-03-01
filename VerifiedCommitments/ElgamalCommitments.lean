@@ -15,12 +15,10 @@ class PublicParameters (G : Type) extends
   [decidable_G : DecidableEq G]
   q : ℕ
   [neZero_q : NeZero q]
-  -- [fact (0 < params.q)]
   prime_q : Nat.Prime q
   g : G
   card_eq : Fintype.card G = q
-  g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
-  G_card_q : Fintype.card G = q
+  gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
 
 -- Make instances available
 variable {G : Type} [params : PublicParameters G]
@@ -31,15 +29,13 @@ instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
    SCHEME DEFINITION
    ======================================== -/
 
-noncomputable def setup : PMF (G × ZMod params.q) :=
-do
+noncomputable def setup : PMF (G × ZMod params.q) := do
   let x ← PMF.uniformOfFintype (ZMod params.q)
   return (params.g^x.val, x)
 
-noncomputable def commit (h m : G) : PMF ((G × G) × ZMod params.q) :=
-do
+noncomputable def commit (h m : G) : PMF ((G × G) × ZMod params.q) := do
   let r ← PMF.uniformOfFintype (ZMod params.q)
-  pure ((params.g^r.val, h^r.val * m), r)
+  return ((params.g^r.val, h^r.val * m), r)
 
 def verify (h m : G) (c : (G × G)) (o : ZMod params.q) : ZMod 2 :=
   if c = ⟨params.g^o.val, h^o.val * m⟩ then 1 else 0
@@ -67,11 +63,11 @@ theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G param
 namespace DDH
 
 variable (G : Type) [Fintype G] [Group G]
-          (g : G) (g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g)
-          (q : ℕ) [NeZero q] [Fact (0 < q)] (G_card_q : Fintype.card G = q)
+          (g : G) (gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g)
+          (q : ℕ) [NeZero q] [Fact (0 < q)] (card_eq : Fintype.card G = q)
           (D : G → G → G → PMF (ZMod 2))
 
-include g_gen_G G_card_q
+include gen_G card_eq
 
 noncomputable def Game0 : PMF (ZMod 2) :=
 do
@@ -184,7 +180,7 @@ lemma exp_bij : Function.Bijective (fun (z : ZMod params.q) => params.g ^ z.val)
   apply (Fintype.bijective_iff_surjective_and_card _).mpr
   simp [params.card_eq]
   intro y
-  obtain ⟨k, hk⟩ := params.g_gen_G y
+  obtain ⟨k, hk⟩ := params.gen_G y
   use (k : ZMod params.q)
   simp only at hk ⊢
   rw [← hk]
@@ -393,7 +389,7 @@ lemma ordg_eq_q : orderOf params.g = params.q := by
       constructor
       · exact Subtype.val_injective
       · intro x
-        use ⟨x, params.g_gen_G x⟩
+        use ⟨x, params.gen_G x⟩
     exact Fintype.card_of_bijective this
   rw [← h_card_zpow, h_card_eq, params.card_eq]
 
