@@ -1,16 +1,68 @@
 -- From cryptolib licensed under Apache 2.0
 -- https://github.com/joeylupo/cryptolib
 
-/-
- -----------------------------------------------------------
-  Correctness and semantic security of ElGamal public-key
-  encryption scheme
- -----------------------------------------------------------
--/
-
-import Mathlib
 import VerifiedCommitments.cryptolib
 import VerifiedCommitments.CommitmentScheme
+
+/- ========================================
+   PUBLIC PARAMETERS
+   ======================================== -/
+
+namespace Elgamal
+
+class PublicParameters (G : Type) extends
+  Fintype G, Group G, IsCyclic G where
+  [decidable_G : DecidableEq G]
+  q : ℕ
+  [neZero_q : NeZero q]
+  -- [fact (0 < params.q)]
+  prime_q : Nat.Prime q
+  g : G
+  card_eq : Fintype.card G = q
+  g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
+  G_card_q : Fintype.card G = q
+
+-- Make instances available
+variable {G : Type} [params : PublicParameters G]
+instance : DecidableEq G := params.decidable_G
+instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
+
+/- ========================================
+   SCHEME DEFINITION
+   ======================================== -/
+
+noncomputable def setup : PMF (G × ZMod params.q) :=
+do
+  let x ← PMF.uniformOfFintype (ZMod params.q)
+  return (params.g^x.val, x)
+
+noncomputable def commit (h m : G) : PMF ((G × G) × ZMod params.q) :=
+do
+  let r ← PMF.uniformOfFintype (ZMod params.q)
+  pure ((params.g^r.val, h^r.val * m), r)
+
+def verify (h m : G) (c : (G × G)) (o : ZMod params.q) : ZMod 2 :=
+  if c = ⟨params.g^o.val, h^o.val * m⟩ then 1 else 0
+
+noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G where
+  setup := setup
+  commit := commit
+  verify := verify
+
+/- ========================================
+   CORRECTNESS
+   ======================================== -/
+
+theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G params) := by
+  intro h m
+  show PMF.bind (scheme.commit h m) _ = _
+  simp only [scheme]
+  unfold commit verify
+  simp only [bind_pure_comp, Functor.map, PMF.bind_bind, Function.comp_apply, PMF.pure_bind, ↓reduceIte, PMF.bind_const]
+
+/- ========================================
+   DDH EXPERIMENT
+   ======================================== -/
 
 namespace DDH
 
@@ -20,8 +72,6 @@ variable (G : Type) [Fintype G] [Group G]
           (D : G → G → G → PMF (ZMod 2))
 
 include g_gen_G G_card_q
-
-instance : Fintype (ZMod q) := ZMod.fintype q
 
 noncomputable def Game0 : PMF (ZMod 2) :=
 do
@@ -38,67 +88,9 @@ do
   let b ← D (g^x.val) (g^y.val) (g^z.val)
   pure b
 
--- DDH0(D) is the event that D outputs 1 upon receiving (g^x, g^y, g^(xy))
--- local notation `Pr[DDH0(D)]` := (DDH0 G g g_gen_G q G_card_q D 1 : ℝ)
-
--- DDH1(D) is the event that D outputs 1 upon receiving (g^x, g^y, g^z)
--- local notation `Pr[DDH1(D)]` := (DDH1 G g g_gen_G q G_card_q D 1 : ℝ)
-
 def Assumption (ε : ENNReal) : Prop := (Game0 G g q D 1) - (Game1 G g q D 1) ≤ ε
 
 end DDH
-
-namespace Elgamal
-
-class ElgamalParameters (G : Type) extends
-  Fintype G, Group G, IsCyclic G where
-  [decidable_G : DecidableEq G]
-  q : ℕ
-  [neZero_q : NeZero q]
-  -- [fact (0 < params.q)]
-  prime_q : Nat.Prime q
-  g : G
-  card_eq : Fintype.card G = q
-  g_gen_G : ∀ (x : G), x ∈ Subgroup.zpowers g
-  G_card_q : Fintype.card G = q
-
--- Make instances available
-variable {G : Type} [params : ElgamalParameters G]
-instance : DecidableEq G := params.decidable_G
-instance : Fact (Nat.Prime params.q) := ⟨params.prime_q⟩
-
-noncomputable def setup : PMF (G × ZMod params.q) := -- Need to include x to match CommitmentScheme spec
-do
-  let x ← PMF.uniformOfFintype (ZMod params.q)
-  return (params.g^x.val, x)
-
-noncomputable def commit (h m : G) : PMF ((G × G) × ZMod params.q) :=
-do
-  let r ← PMF.uniformOfFintype (ZMod params.q)
-  pure ((params.g^r.val, h^r.val * m), r)
-
-def verify (h m : G) (c : (G × G)) (o : ZMod params.q) : ZMod 2 :=
-  if c = ⟨params.g^o.val, h^o.val * m⟩ then 1 else 0
-
-noncomputable def scheme : CommitmentScheme G (G × G) (ZMod params.q) G :=
-{
-  setup := setup,
-  commit := commit,
-  verify := verify
-}
-/-
-  -----------------------------------------------------------
-  Proof of correctness of ElGamal
-  -----------------------------------------------------------
--/
-
-theorem elgamal_commitment_correctness : Commitment.correctness (@scheme G params) := by
-  intro h m
-  show PMF.bind (scheme.commit h m) _ = _
-  simp only [scheme]
-  unfold commit verify
-  simp only [bind_pure_comp, Functor.map, PMF.bind_bind, Function.comp_apply, PMF.pure_bind, ↓reduceIte, PMF.bind_const]
-
 
 /-
   -----------------------------------------------------------
