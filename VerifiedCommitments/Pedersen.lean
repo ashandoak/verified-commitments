@@ -140,9 +140,12 @@ end DLog
    ======================================== -/
 
 lemma ordg_eq_q : orderOf params.g = params.q := by
-  have h_card_zpow : Fintype.card (Subgroup.zpowers params.g) = orderOf params.g := Fintype.card_zpowers
-  have h_card_eq : Fintype.card (Subgroup.zpowers params.g) = Fintype.card G := by
-    have : Function.Bijective (Subtype.val : Subgroup.zpowers params.g → G) := by
+  have h_card_zpow : Fintype.card (Subgroup.zpowers params.g) =
+      orderOf params.g := Fintype.card_zpowers
+  have h_card_eq : Fintype.card (Subgroup.zpowers params.g) =
+      Fintype.card G := by
+    have : Function.Bijective (Subtype.val :
+        Subgroup.zpowers params.g → G) := by
       constructor
       · exact Subtype.val_injective
       · intro x
@@ -150,7 +153,8 @@ lemma ordg_eq_q : orderOf params.g = params.q := by
     exact Fintype.card_of_bijective this
   rw [← h_card_zpow, h_card_eq, params.card_eq]
 
-noncomputable def generate_a : PMF (ZModMult params.q) := PMF.uniformOfFintype (ZModMult params.q)
+noncomputable def generate_a : PMF (ZModMult params.q) :=
+    PMF.uniformOfFintype (ZModMult params.q)
 
 /- ========================================
    HIDING PROPERTY
@@ -383,7 +387,7 @@ lemma binding_reduction_to_dlog
 
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
 
-  rw [PMF.bind_apply ]
+  rw [PMF.bind_apply]
   apply ENNReal.tsum_le_tsum
   intro ⟨h, a⟩
 
