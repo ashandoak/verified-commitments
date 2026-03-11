@@ -95,7 +95,8 @@ noncomputable def comp_hiding_game
 
 /-- A commitment scheme is computationally hiding if every adversary’s advantage
 over random guessing in the hiding game is at most `ε`. -/
-def computational_hiding (scheme : CommitmentScheme M C O K) (ε : ENNReal) : Prop :=
+def computational_hiding (scheme : CommitmentScheme M C O K)
+    (ε : ENNReal) : Prop :=
   ∀ (A : TwoStageAdversary K M C), comp_hiding_game scheme A 1 - 1/2 ≤ ε
 
 end Commitment
