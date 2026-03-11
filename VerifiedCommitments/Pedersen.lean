@@ -353,17 +353,17 @@ lemma gpow_eq_of_two_valid_openings
     conv_rhs at collision => arg 2; rw [← pow_mul]
     rw [← pow_add, ← pow_add] at collision
 
-    have h_coprime : (guess.o' - guess.o).val.Coprime params.q := by
-      cases Nat.coprime_or_dvd_of_prime params.prime_q (guess.o' - guess.o).val with
-      | inl h_cop => exact Nat.coprime_comm.mp h_cop
-      | inr h_dvd =>
-        exfalso
-        have h_zero : guess.o' - guess.o = 0 := by
-          rw [← ZMod.val_eq_zero]
-          have h_mod_zero : (guess.o' - guess.o).val % params.q = 0 := Nat.mod_eq_zero_of_dvd h_dvd
-          have h_val_bound : (guess.o' - guess.o).val < params.q := ZMod.val_lt (guess.o' - guess.o)
-          exact Nat.eq_zero_of_dvd_of_lt h_dvd h_val_bound
-        exact ho_ne.symm (eq_of_sub_eq_zero h_zero)
+    -- have h_coprime : (guess.o' - guess.o).val.Coprime params.q := by
+    --   cases Nat.coprime_or_dvd_of_prime params.prime_q (guess.o' - guess.o).val with
+    --   | inl h_cop => exact Nat.coprime_comm.mp h_cop
+    --   | inr h_dvd =>
+    --     exfalso
+    --     have h_zero : guess.o' - guess.o = 0 := by
+    --       rw [← ZMod.val_eq_zero]
+    --       have h_mod_zero : (guess.o' - guess.o).val % params.q = 0 := Nat.mod_eq_zero_of_dvd h_dvd
+    --       have h_val_bound : (guess.o' - guess.o).val < params.q := ZMod.val_lt (guess.o' - guess.o)
+    --       exact Nat.eq_zero_of_dvd_of_lt h_dvd h_val_bound
+    --     exact ho_ne.symm (eq_of_sub_eq_zero h_zero)
 
     have h_congr_nat : guess.m.val + a.val * guess.o.val ≡ guess.m'.val + a.val * guess.o'.val [MOD params.q] := by
       simpa [ordg_eq_q] using (pow_eq_pow_iff_modEq.mp collision)
