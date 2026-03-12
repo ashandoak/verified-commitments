@@ -7,7 +7,6 @@ import Mathlib.Algebra.Field.ZMod
 import VerifiedCommitments.MapPMFBijection
 import VerifiedCommitments.cryptolib
 import Mathlib.Tactic
-
 namespace Pedersen
 
 /- ========================================
