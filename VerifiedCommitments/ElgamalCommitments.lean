@@ -87,7 +87,7 @@ end DDH
    HIDING PROPERTY
    ======================================== -/
 
-noncomputable def D_from_adversary
+noncomputable def DDHOracleDistinguisher
     (A : TwoStageAdversary G G (G × G)) : G → G → G → PMF (ZMod 2) :=
   fun gx gy gz => do
     let ((m₀, m₁), state) ← A.stage1 gx
@@ -129,8 +129,8 @@ noncomputable def Game2
 theorem ComputationalHidingGame_DDH0
     (A : TwoStageAdversary G G (G × G)) :
     Commitment.comp_hiding_game scheme A =
-    DDH.experiment0 (D_from_adversary A) := by
-  simp only [Commitment.comp_hiding_game, DDH.experiment0, bind, scheme, setup, commit, D_from_adversary]
+    DDH.experiment0 (DDHOracleDistinguisher A) := by
+  simp only [Commitment.comp_hiding_game, DDH.experiment0, bind, scheme, setup, commit, DDHOracleDistinguisher]
   simp_rw [PMF.bind_bind (PMF.uniformOfFintype (ZMod params.q))]
   apply bind_skip'
   intro x
@@ -149,8 +149,8 @@ theorem ComputationalHidingGame_DDH0
   winning Game1 (i.e. guessing the correct bit) is equal to the
   probability of D winning the game DDH1.
 -/
-theorem Game1_DDH1 (A : TwoStageAdversary G G (G × G)) : @Game1 G params A = DDH.experiment1 (D_from_adversary A) := by
-  simp only [DDH.experiment1, Game1, bind, D_from_adversary]
+theorem Game1_DDH1 (A : TwoStageAdversary G G (G × G)) : @Game1 G params A = DDH.experiment1 (DDHOracleDistinguisher A) := by
+  simp only [DDH.experiment1, Game1, bind, DDHOracleDistinguisher]
   simp only [PMF.bind_bind, mul_ite]
   apply bind_skip'
   intro x
@@ -353,7 +353,7 @@ variable (ε : ENNReal)
 
 theorem hiding_from_ddh_single_adversary
     (A : TwoStageAdversary G G (G × G))
-    (DDH_assumption : DDH.Assumption (D_from_adversary A) ε) :
+    (DDH_assumption : DDH.Assumption (DDHOracleDistinguisher A) ε) :
     Commitment.comp_hiding_game scheme A 1 - 1/2 ≤ ε := by
   rw [ComputationalHidingGame_DDH0]
   have h : ((PMF.uniformOfFintype (ZMod 2)) 1) = 1/2 := by
@@ -371,7 +371,7 @@ theorem computational_hiding_from_ddh (ε : ENNReal)
   unfold Commitment.computational_hiding
   intro hA
   apply hiding_from_ddh_single_adversary
-  exact DDH_hard (D_from_adversary hA)
+  exact DDH_hard (DDHOracleDistinguisher hA)
 
 
 /- ========================================

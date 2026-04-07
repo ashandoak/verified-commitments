@@ -7,7 +7,6 @@ import Mathlib.Algebra.Field.ZMod
 import VerifiedCommitments.MapPMFBijection
 import VerifiedCommitments.cryptolib
 import Mathlib.Tactic
-
 namespace Pedersen
 
 /- ========================================
@@ -124,7 +123,7 @@ noncomputable def DLogExperiment
     (A h).bind fun x' =>
       pure <| if params.g^x'.val = params.g^(x).val then 1 else 0
 
-noncomputable def constructDLogAdversary
+noncomputable def DLogOracleAdversary
     (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q)))
     (h : G) : PMF (ZMod params.q) :=
   PMF.bind (A h) fun guess =>
@@ -382,8 +381,8 @@ lemma gpow_eq_of_two_valid_openings
 lemma binding_reduction_to_dlog
     (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))) : -- Pedersen adversary
   Commitment.comp_binding_game (scheme) A 1 ≤
-    DLogExperiment (constructDLogAdversary A) 1 := by
-  unfold Commitment.comp_binding_game DLogExperiment constructDLogAdversary
+    DLogExperiment (DLogOracleAdversary A) 1 := by
+  unfold Commitment.comp_binding_game DLogExperiment DLogOracleAdversary
 
   simp only [Pedersen.scheme, Pedersen.setup, Pedersen.verify]
 
@@ -497,7 +496,7 @@ theorem computational_binding :
     ∀ (A : G → PMF (BindingGuess (ZMod params.q) G (ZMod params.q))),
     Commitment.comp_binding_game (@scheme G params) A 1 ≤ ε := by
   intro ε A' A
-  exact le_trans (binding_reduction_to_dlog A) (A' (constructDLogAdversary A))
+  exact le_trans (binding_reduction_to_dlog A) (A' (DLogOracleAdversary A))
 
 end Binding
 
