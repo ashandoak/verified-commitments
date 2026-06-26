@@ -1,20 +1,29 @@
-import Mathlib.Probability.Distributions.Uniform
+/-
+Copyright (c) 2026 Ashley Blacquiere. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Ashley Blacquiere
+-/
 
-/-- A CommitmentScheme is a structure over four spaces:
-M: Message space
-C: Commitment space
-O: Opening value space
-K: Key space
+module
 
-And that contains three algorithms:
-setup: returns a public parameter and associated randomness
-commit: given the public parameter and a message produces a commitment and an opening value
-verify: given the public parameter, message and associated commit and opening value returns 1 when the commit opens to the given message and 0 otherwise.-/
-structure CommitmentScheme (M C O K : Type) where
-  setup : PMF (K × O)
-  commit : K → M → PMF (C × O)
-  verify : K → M → C → O → ZMod 2
+public import Mathlib.Probability.ProbabilityMassFunction.Basic
+public import VerifiedCommitments.Scheme
 
+/-!
+# Commitment: Definitions
+
+Core definitions for commitment schemes following [KatzLindell2020], Chapter 6.
+
+## Main definitions
+
+-/
+
+@[expose] public section
+
+namespace Crypto.Protocols.Commitment.Scheme
+
+universe u
+variable {M K C O : Type}
 
 /-- The structure of binding adversary guesses for use in the computational binding game.-/
 structure BindingGuess (M C O : Type) where
@@ -30,49 +39,36 @@ structure TwoStageAdversary (K M C : Type) where
   stage1 : K → PMF ((M × M) × state)
   stage2 : C → state → PMF (ZMod 2)
 
-namespace Commitment
-
-variable {M C O K : Type}
-
-/-- For any public parameters `h` and any message `m` if `commit` outputs a commitment `c` and opening value `o`, then `verify h m c o` accepts with probability 1.-/
-def correctness (scheme : CommitmentScheme M C O K) : Prop :=
-  ∀ (h : K) (m : M), (scheme.commit h m |>.bind fun (c, o) =>
-    pure <| scheme.verify h m c o) = pure 1
 
 /-- A commitment scheme with public parameter `h` is perfectly binding if no commitment `c` can be opened to two different messages. For two purported openings `(m,o)` and `(m',o')` both verifying for the same `c`, the messages must be equal (`m = m'`). -/
-def perfect_binding (scheme : CommitmentScheme M C O K) : Prop :=
+def perfect_binding (scheme : Scheme M K C O) : Prop :=
   ∀ (h : K) (c : C) (m m' : M) (o o' : O),
-    scheme.verify h m c o = 1 →
-      scheme.verify h m' c o' = 1 →
+    scheme.verify m h c o = 1 →
+      scheme.verify m' h c o' = 1 →
         m = m'
 
 /-- A commitment scheme is perfectly hiding if for any messages `m` and `m'`, the induced distribution on commitments is the same. Sampling `h ← setup` and then committing to `m` or `m'` under `h` yields identical commitment distributions. -/
-def perfect_hiding (scheme: CommitmentScheme M C O K) : Prop :=
-  ∀ (m m' : M) (c : C),
-    PMF.bind scheme.setup (fun (h, _) =>
-      PMF.bind (scheme.commit h m) (fun (c, _) =>
-        pure c)) c
-    =
-    PMF.bind scheme.setup (fun (h, _) =>
-      PMF.bind (scheme.commit h m') (fun (c, _) =>
-        pure c)) c
+def perfect_hiding (scheme : Scheme M K C O) : Prop :=
+  ∀ h m m' c,
+    ((scheme.com m h).map Prod.fst) c =
+    ((scheme.com m' h).map Prod.fst) c
 
 /- Computational Binding -/
 
 /-- For any adversary `A` that accepts `h ← setup` and outputs a single commitment `c` together with two purported openings `(m,o)` and `(m',o')`, the computational binding game outputs `1` if `c` opens to both `(m,o)` and `(m',o') and the messages differ (`m ≠ m'`). -/
 noncomputable def comp_binding_game
-    [DecidableEq M] (scheme : CommitmentScheme M C O K)
+    [DecidableEq M] (scheme : Scheme M K C O)
     (A : K → PMF (BindingGuess M C O)) : PMF (ZMod 2) := do
-  let (h, _) ← scheme.setup
+  let (h, _) ← scheme.gen
   let guess ← A h
   pure (
-    if scheme.verify h guess.m guess.c guess.o = 1 ∧
-      scheme.verify h guess.m' guess.c guess.o' = 1 ∧
+    if scheme.verify guess.m h guess.c guess.o = 1 ∧
+      scheme.verify guess.m' h guess.c guess.o' = 1 ∧
         guess.m ≠ guess.m'
           then 1 else 0 )
 
 /-- A commitment scheme is computationally binding if every adversary’s probability of winning the computational binding game is at most `ε`. -/
-def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K)
+def computational_binding [DecidableEq M] (scheme : Scheme M K C O)
     (ε : ENNReal) : Prop :=
   ∀ (A' : K → PMF (BindingGuess M C O )), comp_binding_game scheme A' 1 ≤ ε
 
@@ -80,19 +76,19 @@ def computational_binding [DecidableEq M] (scheme : CommitmentScheme M C O K)
 
 /-- For any `TwoStageAdversary` `A`, sample `h ← setup` and give `h` to the adversary’s first stage to produce two challenge messages `m₀, m₁. The computational hiding game samples a uniform bit `b`, computes a commitment to `m_b`, and gives the commitment `c` to the adversary’s second stage. The game outputs a bit indicating whether the adversary’s guess matches `b`. -/
 noncomputable def comp_hiding_game
-    (scheme : CommitmentScheme M C O K)
+    (scheme : Scheme M K C O)
     (A : TwoStageAdversary K M C) := do
-  let (h, _) ← scheme.setup
+  let (h, _) ← scheme.gen
   let ((m₀, m₁), state) ← A.stage1 h
   let b ← PMF.uniformOfFintype (ZMod 2)
-  let (c, _) ← scheme.commit h (if b = 0 then m₀ else m₁)
+  let (c, _) ← scheme.com (if b = 0 then m₀ else m₁) h
   let b' ← A.stage2 c state
   pure (1 + b + b')
 
 /-- A commitment scheme is computationally hiding if every adversary’s advantage
 over random guessing in the hiding game is at most `ε`. -/
-def computational_hiding (scheme : CommitmentScheme M C O K)
+def computational_hiding (scheme : Scheme M K C O)
     (ε : ENNReal) : Prop :=
   ∀ (A : TwoStageAdversary K M C), comp_hiding_game scheme A 1 - 1/2 ≤ ε
 
-end Commitment
+end Crypto.Protocols.Commitment.Scheme
